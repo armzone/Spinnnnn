@@ -1,11 +1,10 @@
-wait(30)
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
 local placeId = game.PlaceId
-local checkInterval = 60
+local checkInterval = 30
 local firebaseUrl = "https://jobid-1e3dc-default-rtdb.asia-southeast1.firebasedatabase.app/roblox_servers.json"
 
 local killedByPlayerCount = 0
