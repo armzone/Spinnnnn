@@ -69,8 +69,8 @@ while true do
     local currentPlayers = #Players:GetPlayers()
     print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers)
 
-    if currentPlayers > 15 then
-        print("⚠️ ผู้เล่นเกิน 10 คน กำลังสุ่มเซิร์ฟใหม่...")
+    if currentPlayers > 8 then
+        print("⚠️ ผู้เล่นเกิน 8 คน กำลังสุ่มเซิร์ฟใหม่...")
         teleportToNewServer()
         break
     else
