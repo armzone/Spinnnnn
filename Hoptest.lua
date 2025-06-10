@@ -53,9 +53,45 @@ local function setupDeathDetection()
     local guiPath = player:WaitForChild("PlayerGui"):WaitForChild("DeathScreen"):WaitForChild("DeathScreenHolder"):WaitForChild("Frame"):WaitForChild("DeathMessage")
     
     local function checkIfKilledByPlayer(text)
-        -- สร้างรูปแบบการค้นหาชื่อผู้เล่นในข้อความ DeathMessage
-        local pattern = "<b><i>" .. player.Name .. "</i></b>"
-        return text:find(pattern)
+        -- ใช้ DisplayName ก่อน ถ้าไม่มีก็ใช้ Name (สำหรับชื่อที่แสดงในเกม)
+        local playerDisplayName = player.DisplayName or player.Name
+        
+        -- ตรวจสอบว่า 'เรา' คือเหยื่อ (ระบุโดย "You", "คุณ", หรือชื่อผู้เล่นของเรา)
+        local victimIsPresent = text:find("You", 1, true) or text:find("คุณ", 1, true) or text:find(playerDisplayName, 1, true)
+
+        if not victimIsPresent then
+            return false -- ไม่ใช่ข้อความการตายที่เกี่ยวกับเรา
+        end
+
+        -- พยายามดึงชื่อที่อยู่ระหว่างแท็ก <b><i>...</i></b> ซึ่งมักจะเป็นชื่อผู้ฆ่า
+        local killerNameInTags = text:match("<b><i>(.-)</i></b>")
+
+        if killerNameInTags then
+            -- ตรวจสอบว่าชื่อที่ดึงมาได้ไม่ใช่ชื่อผู้เล่นของเราเอง (ยืนยันว่าถูกฆ่าโดยผู้เล่นอื่น)
+            if killerNameInTags ~= playerDisplayName and killerNameInTags ~= player.Name then
+                -- ตรวจสอบวลีทั่วไปที่บ่งบอกถึงการถูกฆ่า (จากภาพที่ให้มา)
+                local killedByPhrases = {
+                    "killed by",
+                    "slain by",
+                    "ถูกฆ่าโดย", -- Thai for "was killed by"
+                    "สังหารโดย", -- Thai for "slain by"
+                    "turned you into", -- "turned you into free real estate"
+                    "got clapped by", -- "You just got clapped by"
+                    "confirmed by",   -- "Your skill issue has been confirmed by"
+                    "taken down by",
+                    "caused your death", -- เช่น "X caused your death"
+                }
+                
+                for _, phrase in ipairs(killedByPhrases) do
+                    -- ตรวจสอบว่ามีวลีที่บ่งบอกถึงการถูกฆ่าอยู่ในข้อความหรือไม่
+                    if text:find(phrase, 1, true) then
+                        return true -- ถ้าพบ แสดงว่าถูกฆ่าโดยผู้เล่นคนอื่น
+                    end
+                end
+            end
+        end
+        
+        return false -- ไม่ตรงตามเงื่อนไขการถูกฆ่าโดยผู้เล่น
     end
 
     -- ตรวจจับการเปลี่ยนแปลงของข้อความ DeathMessage
