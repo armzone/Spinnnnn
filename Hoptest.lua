@@ -1,139 +1,128 @@
+--[[
+    Service Definitions
+    Initializes required Roblox services for the script to function.
+]]
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
+--[[
+    Configuration Variables
+    - placeId: The ID of the current game place.
+    - firebaseUrl: The URL to your Firebase Realtime Database.
+    - killedByPlayerCount: Counter for how many times the player has been killed by another player.
+    - maxPlayerKills: The number of player kills to trigger a server hop.
+    - maxPlayersInServer: The maximum number of players allowed before triggering a server hop.
+    - checkInterval: How often (in seconds) to check the player count.
+]]
 local placeId = game.PlaceId
-local checkInterval = 30 -- ระยะเวลาตรวจสอบ (วินาที)
 local firebaseUrl = "https://jobid-1e3dc-default-rtdb.asia-southeast1.firebasedatabase.app/roblox_servers.json"
+local killedByPlayerCount = 0
+local maxPlayerKills = 2
+local maxPlayersInServer = 10
+local checkInterval = 30
+local isTeleporting = false
 
-local killedByPlayerCount = 0 -- นับจำนวนครั้งที่ถูกผู้เล่นฆ่า
-local maxPlayerKills = 2 -- จำนวนครั้งสูงสุดที่ถูกผู้เล่นฆ่าก่อนจะเทเลพอร์ต
-
--- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
+--[[
+    @function getRandomJobId
+    @description Fetches server list from Firebase and returns a random JobId from a different server.
+    @return (string | nil) A random JobId or nil if fetching fails or no other servers are available.
+]]
 local function getRandomJobId()
     local success, response = pcall(function()
-        -- พยายามดึงข้อมูล JSON จาก URL
         return HttpService:JSONDecode(game:HttpGet(firebaseUrl))
     end)
 
     if success and response then
         local serverList = {}
         for _, serverData in pairs(response) do
-            -- ตรวจสอบว่ามี JobId และไม่ใช่เซิร์ฟเวอร์ปัจจุบัน
             if serverData.id and serverData.id ~= game.JobId then
                 table.insert(serverList, serverData.id)
             end
         end
+        
         if #serverList > 0 then
-            -- ถ้ามีเซิร์ฟเวอร์อื่นในรายการ ให้สุ่ม JobId
             return serverList[math.random(1, #serverList)]
         end
     end
 
-    warn("❌ ไม่สามารถดึงข้อมูล JobId จาก Firebase ได้ หรือไม่มีเซิร์ฟเวอร์อื่น")
+    warn("❌ ไม่สามารถดึงข้อมูล JobId จาก Firebase ได้ หรือไม่มีเซิร์ฟอื่น")
     return nil
 end
 
--- ✅ ฟังก์ชันเทเลพอร์ต
+--[[
+    @function teleportToNewServer
+    @description Initiates teleportation to a new server instance, ensuring it only runs once.
+]]
 local function teleportToNewServer()
+    if isTeleporting then return end -- ป้องกันการเรียกเทเลพอร์ตซ้ำซ้อน
+    isTeleporting = true
+
     local jobId = getRandomJobId()
     if jobId then
         print("🚀 กำลังเทเลพอร์ตไป JobId: " .. jobId)
-        -- เทเลพอร์ตผู้เล่นไปยัง PlaceId และ JobId ที่กำหนด
         TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
     else
         print("❌ ไม่มีเซิร์ฟเวอร์ว่างสำหรับเทเลพอร์ต")
+        isTeleporting = false -- รีเซ็ตถ้าหาเซิร์ฟไม่เจอ
     end
 end
 
--- ✅ ฟังก์ชันตรวจจับข้อความ DeathMessage ที่มี ชื่อผู้เล่น
+--[[
+    @function setupDeathDetection
+    @description Sets up a listener to detect when the local player is killed by another player.
+    If the kill count is reached, it triggers an immediate teleport.
+]]
 local function setupDeathDetection()
-    -- รอ DeathScreen GUI โหลด ซึ่งเป็นที่แสดงข้อความการตาย
     local guiPath = player:WaitForChild("PlayerGui"):WaitForChild("DeathScreen"):WaitForChild("DeathScreenHolder"):WaitForChild("Frame"):WaitForChild("DeathMessage")
     
     local function checkIfKilledByPlayer(text)
-        -- ใช้ DisplayName ก่อน ถ้าไม่มีก็ใช้ Name (สำหรับชื่อที่แสดงในเกม)
-        local playerDisplayName = player.DisplayName or player.Name
-        
-        -- ตรวจสอบว่า 'เรา' คือเหยื่อ (ระบุโดย "You", "คุณ", หรือชื่อผู้เล่นของเรา)
-        local victimIsPresent = text:find("You", 1, true) or text:find("คุณ", 1, true) or text:find(playerDisplayName, 1, true)
-
-        if not victimIsPresent then
-            return false -- ไม่ใช่ข้อความการตายที่เกี่ยวกับเรา
-        end
-
-        -- พยายามดึงชื่อที่อยู่ระหว่างแท็ก <b><i>...</i></b> ซึ่งมักจะเป็นชื่อผู้ฆ่า
-        local killerNameInTags = text:match("<b><i>(.-)</i></b>")
-
-        if killerNameInTags then
-            -- ตรวจสอบว่าชื่อที่ดึงมาได้ไม่ใช่ชื่อผู้เล่นของเราเอง (ยืนยันว่าถูกฆ่าโดยผู้เล่นอื่น)
-            if killerNameInTags ~= playerDisplayName and killerNameInTags ~= player.Name then
-                -- ตรวจสอบวลีทั่วไปที่บ่งบอกถึงการถูกฆ่า (จากภาพที่ให้มา)
-                local killedByPhrases = {
-                    "killed by",
-                    "slain by",
-                    "ถูกฆ่าโดย", -- Thai for "was killed by"
-                    "สังหารโดย", -- Thai for "slain by"
-                    "turned you into", -- "turned you into free real estate"
-                    "got clapped by", -- "You just got clapped by"
-                    "confirmed by",   -- "Your skill issue has been confirmed by"
-                    "taken down by",
-                    "caused your death", -- เช่น "X caused your death"
-                }
-                
-                for _, phrase in ipairs(killedByPhrases) do
-                    -- ตรวจสอบว่ามีวลีที่บ่งบอกถึงการถูกฆ่าอยู่ในข้อความหรือไม่
-                    if text:find(phrase, 1, true) then
-                        return true -- ถ้าพบ แสดงว่าถูกฆ่าโดยผู้เล่นคนอื่น
-                    end
-                end
-            end
-        end
-        
-        return false -- ไม่ตรงตามเงื่อนไขการถูกฆ่าโดยผู้เล่น
+        local pattern = "<b><i>" .. player.Name .. "</i></b>"
+        return text:find(pattern)
     end
 
-    -- ตรวจจับการเปลี่ยนแปลงของข้อความ DeathMessage
     guiPath:GetPropertyChangedSignal("Text"):Connect(function()
+        if isTeleporting then return end -- ถ้ากำลังจะเทเลพอร์ตแล้ว ไม่ต้องทำอะไรต่อ
+        
         local newText = guiPath.Text
-        print("🔁 ตรวจพบการเปลี่ยนแปลงข้อความ! ข้อความใหม่: " .. newText)
+        print("🔁 ตรวจพบการเปลี่ยนแปลง Text! ข้อความใหม่: " .. newText)
         
         if checkIfKilledByPlayer(newText) then
             killedByPlayerCount += 1
             print("💀 ถูกผู้เล่นฆ่า (รวม " .. killedByPlayerCount .. " ครั้ง)")
 
             if killedByPlayerCount >= maxPlayerKills then
-                print("⚠️ ถูกผู้เล่นฆ่าเกิน " .. maxPlayerKills .. " ครั้ง กำลังหาเซิร์ฟเวอร์ใหม่...")
+                print("⚠️ ถูกผู้เล่นฆ่าครบ " .. maxPlayerKills .. " ครั้ง! กำลังเทเลพอร์ตทันที...")
                 teleportToNewServer()
-                -- รีเซ็ตจำนวนครั้งที่ถูกฆ่าหลังพยายามเทเลพอร์ต เพื่อให้เริ่มนับใหม่ในเซิร์ฟเวอร์ถัดไป
-                killedByPlayerCount = 0 
             end
         else
-            print("✅ ไม่ใช่ข้อความจากการถูกผู้เล่นฆ่า (ไม่ถูกนับ)")
+            print("✅ การตายนี้ไม่ได้เกิดจากผู้เล่นอื่น")
         end
     end)
 end
 
--- ✅ รอ GUI และเริ่มตรวจจับ
-task.spawn(function()
-    local success, err = pcall(setupDeathDetection)
-    if not success then
-        warn("❌ เกิดข้อผิดพลาดใน setupDeathDetection: " .. tostring(err))
-    end
-end)
+--[[
+    Script Initialization
+    - Spawns the death detection in a new thread.
+    - Starts the main loop for checking player count.
+]]
+task.spawn(setupDeathDetection)
+print("✅ สคริปต์ตรวจจับการตายเริ่มทำงานแล้ว")
 
--- ✅ ลูปตรวจสอบจำนวนผู้เล่นในเซิร์ฟ
-while true do
+while task.wait(checkInterval) do
+    if isTeleporting then 
+        break -- หยุดลูปถ้ามีการเทเลพอร์ตเกิดขึ้นแล้ว (ไม่ว่าจะจากเหตุผลใด)
+    end
+    
     local currentPlayers = #Players:GetPlayers()
-    print("👥 จำนวนผู้เล่นในเซิร์ฟเวอร์: " .. currentPlayers)
+    print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers .. "/" .. maxPlayersInServer)
 
-    if currentPlayers > 10 then
-        print("⚠️ ผู้เล่นเกิน 10 คน กำลังสุ่มเซิร์ฟเวอร์ใหม่...")
+    if currentPlayers > maxPlayersInServer then
+        print("⚠️ ผู้เล่นเกิน " .. maxPlayersInServer .. " คน กำลังหาเซิร์ฟใหม่...")
         teleportToNewServer()
-        -- ไม่มี 'break' ตรงนี้ เพื่อให้ลูปยังคงทำงานต่อไปและตรวจสอบจำนวนผู้เล่นในเซิร์ฟเวอร์ใหม่
+        break -- ออกจากลูปหลังจากสั่งเทเลพอร์ต
     else
-        print("✅ ยังอยู่ในเซิร์ฟเวอร์ที่มีผู้เล่นน้อย")
+        print("✅ จำนวนผู้เล่นยังอยู่ในเกณฑ์ที่กำหนด")
     end
-    wait(checkInterval) -- รอตามช่วงเวลาที่กำหนดก่อนตรวจสอบอีกครั้ง
 end
