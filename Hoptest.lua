@@ -110,7 +110,7 @@ end
 task.spawn(setupDeathDetection)
 print("✅ สคริปต์ตรวจจับการตายเริ่มทำงานแล้ว")
 
-while task.wait(checkInterval) do
+while true do
     if isTeleporting then 
         break -- หยุดลูปถ้ามีการเทเลพอร์ตเกิดขึ้นแล้ว (ไม่ว่าจะจากเหตุผลใด)
     end
@@ -125,4 +125,6 @@ while task.wait(checkInterval) do
     else
         print("✅ จำนวนผู้เล่นยังอยู่ในเกณฑ์ที่กำหนด")
     end
+    
+    task.wait(checkInterval) -- ย้ายมาไว้ท้ายลูปเพื่อให้ทำงานก่อน 1 รอบ แล้วค่อยรอ
 end
