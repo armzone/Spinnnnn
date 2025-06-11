@@ -11,8 +11,11 @@ local killedByPlayerCount = 0
 local maxPlayerKills = 2
 local alreadyTeleported = false
 
+print("📌 สคริปต์เริ่มทำงาน")
+
 -- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
 local function getRandomJobId()
+    print("🌐 กำลังดึง JobId จาก Firebase...")
     local success, response = pcall(function()
         return HttpService:JSONDecode(game:HttpGet(firebaseUrl))
     end)
@@ -22,20 +25,27 @@ local function getRandomJobId()
         for _, serverData in pairs(response) do
             if serverData.id and serverData.id ~= game.JobId then
                 table.insert(serverList, serverData.id)
+                print("✅ พบ JobId: " .. serverData.id)
             end
         end
         if #serverList > 0 then
+            print("🔁 สุ่ม JobId ใหม่จากทั้งหมด: " .. #serverList)
             return serverList[math.random(1, #serverList)]
+        else
+            warn("⚠️ ไม่มีเซิร์ฟอื่นที่ต่างจากปัจจุบัน")
         end
+    else
+        warn("❌ ดึงข้อมูล Firebase ไม่สำเร็จ: " .. tostring(response))
     end
-
-    warn("❌ ไม่สามารถดึงข้อมูล JobId จาก Firebase ได้ หรือไม่มีเซิร์ฟอื่น")
     return nil
 end
 
 -- ✅ ฟังก์ชันเทเลพอร์ต
 local function teleportToNewServer()
-    if alreadyTeleported then return end -- ป้องกันเทเลพอร์ตซ้ำ
+    if alreadyTeleported then
+        print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
+        return
+    end
     alreadyTeleported = true
     local jobId = getRandomJobId()
     if jobId then
@@ -48,20 +58,30 @@ end
 
 -- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่นในเซิฟ
 local function checkIfKilledByOtherPlayer(text)
+    print("🔎 กำลังตรวจสอบข้อความ: " .. text)
     for _, otherPlayer in ipairs(Players:GetPlayers()) do
         if otherPlayer ~= player then
+            print("👥 เปรียบเทียบกับ: " .. otherPlayer.Name)
             if text:lower():find(otherPlayer.Name:lower()) then
+                print("💥 พบชื่อผู้เล่นในข้อความ")
                 return true, otherPlayer.Name
             end
         end
     end
+    print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
     return false
 end
 
 -- ✅ รอ GUI และเริ่มตรวจจับ
 task.spawn(function()
     local success, err = pcall(function()
-        local guiPath = player:WaitForChild("PlayerGui"):WaitForChild("DeathScreen"):WaitForChild("DeathScreenHolder"):WaitForChild("Frame"):WaitForChild("DeathMessage")
+        print("🕵️ รอกำหนด GUI ของ DeathScreen...")
+        local guiPath = player:WaitForChild("PlayerGui"):WaitForChild("DeathScreen", 30)
+        guiPath = guiPath:WaitForChild("DeathScreenHolder", 10)
+        guiPath = guiPath:WaitForChild("Frame", 10)
+        guiPath = guiPath:WaitForChild("DeathMessage", 10)
+
+        print("✅ GUI พบแล้ว! เริ่มตรวจจับข้อความเปลี่ยนแปลง")
 
         guiPath:GetPropertyChangedSignal("Text"):Connect(function()
             local newText = guiPath.Text
@@ -73,11 +93,11 @@ task.spawn(function()
                 print("💀 ถูกผู้เล่นฆ่าโดย: " .. killerName .. " (รวม " .. killedByPlayerCount .. " ครั้ง)")
 
                 if killedByPlayerCount >= maxPlayerKills then
-                    print("⚠️ ถูกผู้เล่นฆ่าเกิน 2 ครั้ง กำลังหาเซิร์ฟใหม่...")
+                    print("⚠️ ถูกฆ่าเกิน " .. maxPlayerKills .. " ครั้ง กำลังเทเลพอร์ต...")
                     teleportToNewServer()
                 end
             else
-                print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ (ไม่ถูกนับ)")
+                print("✅ ข้อความไม่เกี่ยวกับผู้เล่นอื่น")
             end
         end)
     end)
@@ -89,6 +109,7 @@ end)
 
 -- ✅ ลูปตรวจสอบจำนวนผู้เล่นในเซิร์ฟ
 task.spawn(function()
+    print("📊 เริ่มลูปตรวจสอบจำนวนผู้เล่น")
     while not alreadyTeleported do
         local currentPlayers = #Players:GetPlayers()
         print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers)
@@ -98,7 +119,7 @@ task.spawn(function()
             teleportToNewServer()
             break
         else
-            print("✅ ยังอยู่ในเซิร์ฟที่มีผู้เล่นน้อย")
+            print("✅ ยังอยู่ในเซิร์ฟที่เหมาะสม")
         end
         wait(checkInterval)
     end
