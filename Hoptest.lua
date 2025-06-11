@@ -75,13 +75,12 @@ end
 -- ✅ รอ GUI และเริ่มตรวจจับ
 task.spawn(function()
     local success, err = pcall(function()
-        print("🕵️ รอกำหนด GUI ของ DeathScreen...")
-        local guiPath = player:WaitForChild("PlayerGui"):WaitForChild("DeathScreen", 30)
-        guiPath = guiPath:WaitForChild("DeathScreenHolder", 10)
-        guiPath = guiPath:WaitForChild("Frame", 10)
-        guiPath = guiPath:WaitForChild("DeathMessage", 10)
+        local guiPath = player:WaitForChild("PlayerGui"):WaitForChild("DeathScreen")
+            :WaitForChild("DeathScreenHolder"):WaitForChild("Frame")
+            :WaitForChild("Frame"):WaitForChild("DeathMessage")
 
-        print("✅ GUI พบแล้ว! เริ่มตรวจจับข้อความเปลี่ยนแปลง")
+        print("✅ พบ DeathMessage:", guiPath)
+        print("📋 ประเภทของ guiPath:", guiPath.ClassName)
 
         guiPath:GetPropertyChangedSignal("Text"):Connect(function()
             local newText = guiPath.Text
@@ -93,11 +92,11 @@ task.spawn(function()
                 print("💀 ถูกผู้เล่นฆ่าโดย: " .. killerName .. " (รวม " .. killedByPlayerCount .. " ครั้ง)")
 
                 if killedByPlayerCount >= maxPlayerKills then
-                    print("⚠️ ถูกฆ่าเกิน " .. maxPlayerKills .. " ครั้ง กำลังเทเลพอร์ต...")
+                    print("⚠️ ถูกผู้เล่นฆ่าเกิน 2 ครั้ง กำลังหาเซิร์ฟใหม่...")
                     teleportToNewServer()
                 end
             else
-                print("✅ ข้อความไม่เกี่ยวกับผู้เล่นอื่น")
+                print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ (ไม่ถูกนับ)")
             end
         end)
     end)
