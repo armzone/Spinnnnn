@@ -73,38 +73,56 @@ local function checkIfKilledByOtherPlayer(text)
 end
 
 -- ✅ รอ GUI และเริ่มตรวจจับ
+-- ✅ ลูปตรวจจับ GUI DeathMessage อย่างปลอดภัยและต่อเนื่อง
 task.spawn(function()
-    local success, err = pcall(function()
-        local guiPath = player:WaitForChild("PlayerGui"):WaitForChild("DeathScreen")
-            :WaitForChild("DeathScreenHolder"):WaitForChild("Frame")
-            :WaitForChild("Frame"):WaitForChild("DeathMessage")
+    while not alreadyTeleported do
+        local success, err = pcall(function()
+            local guiPath = player:WaitForChild("PlayerGui"):FindFirstChild("DeathScreen")
+            if not guiPath then error("DeathScreen ยังไม่พบ") end
 
-        print("✅ พบ DeathMessage:", guiPath)
-        print("📋 ประเภทของ guiPath:", guiPath.ClassName)
+            local holder = guiPath:FindFirstChild("DeathScreenHolder")
+            if not holder then error("DeathScreenHolder ยังไม่พบ") end
 
-        guiPath:GetPropertyChangedSignal("Text"):Connect(function()
-            local newText = guiPath.Text
-            print("🔁 ตรวจพบข้อความใหม่: " .. newText)
+            local frame1 = holder:FindFirstChild("Frame")
+            if not frame1 then error("Frame ชั้นที่ 1 ยังไม่พบ") end
 
-            local killed, killerName = checkIfKilledByOtherPlayer(newText)
-            if killed then
-                killedByPlayerCount += 1
-                print("💀 ถูกผู้เล่นฆ่าโดย: " .. killerName .. " (รวม " .. killedByPlayerCount .. " ครั้ง)")
+            local frame2 = frame1:FindFirstChild("Frame") or frame1 -- เผื่อไม่มี frame ซ้อน
+            local deathMessage = frame2:FindFirstChild("DeathMessage")
+            if not deathMessage then error("DeathMessage ยังไม่พบ") end
 
-                if killedByPlayerCount >= maxPlayerKills then
-                    print("⚠️ ถูกผู้เล่นฆ่าเกิน 2 ครั้ง กำลังหาเซิร์ฟใหม่...")
-                    teleportToNewServer()
+            print("✅ พบ DeathMessage:", deathMessage)
+            print("📋 ประเภทของ deathMessage:", deathMessage.ClassName)
+
+            deathMessage:GetPropertyChangedSignal("Text"):Connect(function()
+                local newText = deathMessage.Text
+                print("🔁 ตรวจพบข้อความใหม่: " .. newText)
+
+                local killed, killerName = checkIfKilledByOtherPlayer(newText)
+                if killed then
+                    killedByPlayerCount += 1
+                    print("💀 ถูกผู้เล่นฆ่าโดย: " .. killerName .. " (รวม " .. killedByPlayerCount .. " ครั้ง)")
+
+                    if killedByPlayerCount >= maxPlayerKills then
+                        print("⚠️ ถูกผู้เล่นฆ่าเกิน 2 ครั้ง กำลังหาเซิร์ฟใหม่...")
+                        teleportToNewServer()
+                    end
+                else
+                    print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ (ไม่ถูกนับ)")
                 end
-            else
-                print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ (ไม่ถูกนับ)")
-            end
-        end)
-    end)
+            end)
 
-    if not success then
-        warn("❌ เกิดข้อผิดพลาดใน setupDeathDetection: " .. tostring(err))
+            return -- ออกจาก loop ถ้าเจอแล้ว
+        end)
+
+        if not success then
+            warn("❌ ยังหา GUI ไม่เจอ: " .. tostring(err))
+            task.wait(5) -- รอ 5 วินาทีแล้ววนลูปใหม่
+        else
+            break -- ถ้าหาเจอแล้ว ไม่ต้องวนอีก
+        end
     end
 end)
+
 
 -- ✅ ลูปตรวจสอบจำนวนผู้เล่นในเซิร์ฟ
 task.spawn(function()
