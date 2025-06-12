@@ -13,7 +13,6 @@ local alreadyTeleported = false
 
 print("📌 สคริปต์เริ่มทำงาน")
 
--- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
 local function getRandomJobId()
     print("🌐 กำลังดึง JobId จาก Firebase...")
     local success, response = pcall(function()
@@ -40,7 +39,6 @@ local function getRandomJobId()
     return nil
 end
 
--- ✅ ฟังก์ชันเทเลพอร์ต
 local function teleportToNewServer()
     if alreadyTeleported then
         print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
@@ -56,24 +54,39 @@ local function teleportToNewServer()
     end
 end
 
--- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่นในเซิฟ
+-- ✅ ตรวจว่าข้อความชื่อว่าเป็นเลขล้วนหรือไม่
+local function isNumericName(name)
+    return name:match("^%d+$") ~= nil
+end
+
+-- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่นในเซิร์ฟ (รวมชื่อเลขล้วน)
 local function checkIfKilledByOtherPlayer(text)
     print("🔎 กำลังตรวจสอบข้อความ: " .. text)
     for _, otherPlayer in ipairs(Players:GetPlayers()) do
         if otherPlayer ~= player then
-            print("👥 เปรียบเทียบกับ: " .. otherPlayer.Name)
-            if text:lower():find(otherPlayer.Name:lower()) then
+            local nameLower = otherPlayer.Name:lower()
+            local displayLower = otherPlayer.DisplayName:lower()
+            local textLower = text:lower()
+
+            if textLower:find(nameLower) or textLower:find(displayLower) then
                 print("💥 พบชื่อผู้เล่นในข้อความ")
                 return true, otherPlayer.Name
             end
         end
     end
+
+    -- ✅ เพิ่มตรวจสอบชื่อเป็นเลขล้วนจาก DeathMessage
+    local numericName = text:match("by%s+(%d+)")
+    if numericName and isNumericName(numericName) then
+        print("💥 พบชื่อเป็นตัวเลขล้วน:", numericName)
+        return true, numericName
+    end
+
     print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
     return false
 end
 
 -- ✅ รอ GUI และเริ่มตรวจจับ
--- ✅ ลูปตรวจจับ GUI DeathMessage อย่างปลอดภัยและต่อเนื่อง
 task.spawn(function()
     while not alreadyTeleported do
         local success, err = pcall(function()
@@ -86,7 +99,7 @@ task.spawn(function()
             local frame1 = holder:FindFirstChild("Frame")
             if not frame1 then error("Frame ชั้นที่ 1 ยังไม่พบ") end
 
-            local frame2 = frame1:FindFirstChild("Frame") or frame1 -- เผื่อไม่มี frame ซ้อน
+            local frame2 = frame1:FindFirstChild("Frame") or frame1
             local deathMessage = frame2:FindFirstChild("DeathMessage")
             if not deathMessage then error("DeathMessage ยังไม่พบ") end
 
@@ -111,18 +124,17 @@ task.spawn(function()
                 end
             end)
 
-            return -- ออกจาก loop ถ้าเจอแล้ว
+            return
         end)
 
         if not success then
             warn("❌ ยังหา GUI ไม่เจอ: " .. tostring(err))
-            task.wait(5) -- รอ 5 วินาทีแล้ววนลูปใหม่
+            task.wait(5)
         else
-            break -- ถ้าหาเจอแล้ว ไม่ต้องวนอีก
+            break
         end
     end
 end)
-
 
 -- ✅ ลูปตรวจสอบจำนวนผู้เล่นในเซิร์ฟ
 task.spawn(function()
