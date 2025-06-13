@@ -13,6 +13,40 @@ local alreadyTeleported = false
 
 print("📌 สคริปต์เริ่มทำงาน")
 
+-- ✅ ตรวจว่า string เป็นตัวเลขล้วน
+local function isNumericName(name)
+    return name:match("^%d+$") ~= nil
+end
+
+-- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่น (รวมถึงชื่อเป็นเลขล้วน)
+local function checkIfKilledByOtherPlayer(text)
+    print("🔎 กำลังตรวจสอบข้อความ: " .. text)
+    local textLower = text:lower()
+
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player then
+            local nameLower = otherPlayer.Name:lower()
+            local displayLower = otherPlayer.DisplayName:lower()
+            if textLower:find(nameLower) or textLower:find(displayLower) then
+                print("💥 พบชื่อผู้เล่นในข้อความ:", otherPlayer.Name)
+                return true, otherPlayer.Name
+            end
+        end
+    end
+
+    -- ตรวจหาคำที่เป็นเลขล้วน
+    for word in string.gmatch(text, "%S+") do
+        if isNumericName(word) then
+            print("💥 พบชื่อเป็นตัวเลขล้วน:", word)
+            return true, word
+        end
+    end
+
+    print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
+    return false
+end
+
+-- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
 local function getRandomJobId()
     print("🌐 กำลังดึง JobId จาก Firebase...")
     local success, response = pcall(function()
@@ -39,6 +73,7 @@ local function getRandomJobId()
     return nil
 end
 
+-- ✅ ฟังก์ชันเทเลพอร์ต
 local function teleportToNewServer()
     if alreadyTeleported then
         print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
@@ -54,39 +89,7 @@ local function teleportToNewServer()
     end
 end
 
--- ✅ ตรวจว่าข้อความชื่อว่าเป็นเลขล้วนหรือไม่
-local function isNumericName(name)
-    return name:match("^%d+$") ~= nil
-end
-
--- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่นในเซิร์ฟ (รวมชื่อเลขล้วน)
-local function checkIfKilledByOtherPlayer(text)
-    print("🔎 กำลังตรวจสอบข้อความ: " .. text)
-    for _, otherPlayer in ipairs(Players:GetPlayers()) do
-        if otherPlayer ~= player then
-            local nameLower = otherPlayer.Name:lower()
-            local displayLower = otherPlayer.DisplayName:lower()
-            local textLower = text:lower()
-
-            if textLower:find(nameLower) or textLower:find(displayLower) then
-                print("💥 พบชื่อผู้เล่นในข้อความ")
-                return true, otherPlayer.Name
-            end
-        end
-    end
-
-    -- ✅ เพิ่มตรวจสอบชื่อเป็นเลขล้วนจาก DeathMessage
-    local numericName = text:match("by%s+(%d+)")
-    if numericName and isNumericName(numericName) then
-        print("💥 พบชื่อเป็นตัวเลขล้วน:", numericName)
-        return true, numericName
-    end
-
-    print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
-    return false
-end
-
--- ✅ รอ GUI และเริ่มตรวจจับ
+-- ✅ ลูปตรวจจับ GUI DeathMessage อย่างปลอดภัยและต่อเนื่อง
 task.spawn(function()
     while not alreadyTeleported do
         local success, err = pcall(function()
@@ -104,7 +107,6 @@ task.spawn(function()
             if not deathMessage then error("DeathMessage ยังไม่พบ") end
 
             print("✅ พบ DeathMessage:", deathMessage)
-            print("📋 ประเภทของ deathMessage:", deathMessage.ClassName)
 
             deathMessage:GetPropertyChangedSignal("Text"):Connect(function()
                 local newText = deathMessage.Text
@@ -123,8 +125,6 @@ task.spawn(function()
                     print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ (ไม่ถูกนับ)")
                 end
             end)
-
-            return
         end)
 
         if not success then
