@@ -13,12 +13,10 @@ local alreadyTeleported = false
 
 print("📌 สคริปต์เริ่มทำงาน")
 
--- ✅ ตรวจว่า string เป็นตัวเลขล้วน
 local function isNumericName(name)
     return name:match("^%d+$") ~= nil
 end
 
--- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่น (รวมถึงชื่อเป็นเลขล้วน)
 local function checkIfKilledByOtherPlayer(text)
     print("🔎 กำลังตรวจสอบข้อความ: " .. text)
     local textLower = text:lower()
@@ -34,7 +32,6 @@ local function checkIfKilledByOtherPlayer(text)
         end
     end
 
-    -- ตรวจหาคำที่เป็นเลขล้วน
     for word in string.gmatch(text, "%S+") do
         if isNumericName(word) then
             print("💥 พบชื่อเป็นตัวเลขล้วน:", word)
@@ -46,7 +43,6 @@ local function checkIfKilledByOtherPlayer(text)
     return false
 end
 
--- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
 local function getRandomJobId()
     print("🌐 กำลังดึง JobId จาก Firebase...")
     local success, response = pcall(function()
@@ -73,23 +69,42 @@ local function getRandomJobId()
     return nil
 end
 
--- ✅ ฟังก์ชันเทเลพอร์ต
 local function teleportToNewServer()
     if alreadyTeleported then
         print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
         return
     end
     alreadyTeleported = true
-    local jobId = getRandomJobId()
-    if jobId then
-        print("🚀 เทเลพอร์ตไป JobId: " .. jobId)
-        TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
-    else
-        print("❌ ไม่มีเซิร์ฟว่างสำหรับเทเลพอร์ต")
+
+    while true do
+        local jobId = getRandomJobId()
+        if not jobId then
+            print("❌ ไม่พบ JobId ลองใหม่ใน 5 วินาที...")
+            task.wait(5)
+            continue
+        end
+
+        print("🚀 พยายามเทเลพอร์ตไป JobId: " .. jobId)
+        local success, err = pcall(function()
+            TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
+        end)
+
+        if success then
+            print("✅ เรียกเทเลพอร์ตสำเร็จ (กำลังโหลด...)")
+            break
+        else
+            warn("❌ เทเลพอร์ตล้มเหลว: " .. tostring(err))
+            if tostring(err):find("Unauthorized") then
+                print("⚠️ เซิร์ฟเวอร์เข้าไม่ได้ (Unauthorized), ลองใหม่ใน 5 วินาที...")
+                task.wait(5)
+            else
+                print("❗ พบข้อผิดพลาดอื่น ลองใหม่ใน 5 วินาที...")
+                task.wait(5)
+            end
+        end
     end
 end
 
--- ✅ ลูปตรวจจับ GUI DeathMessage อย่างปลอดภัยและต่อเนื่อง
 task.spawn(function()
     while not alreadyTeleported do
         local success, err = pcall(function()
@@ -136,7 +151,6 @@ task.spawn(function()
     end
 end)
 
--- ✅ ลูปตรวจสอบจำนวนผู้เล่นในเซิร์ฟ
 task.spawn(function()
     print("📊 เริ่มลูปตรวจสอบจำนวนผู้เล่น")
     while not alreadyTeleported do
