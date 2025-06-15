@@ -73,19 +73,35 @@ local function getRandomJobId()
     return nil
 end
 
--- ✅ ฟังก์ชันเทเลพอร์ต
+-- ✅ ฟังก์ชันเทเลพอร์ตซ้ำจนกว่าจะสำเร็จ
 local function teleportToNewServer()
     if alreadyTeleported then
         print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
         return
     end
-    alreadyTeleported = true
-    local jobId = getRandomJobId()
-    if jobId then
-        print("🚀 เทเลพอร์ตไป JobId: " .. jobId)
-        TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
-    else
-        print("❌ ไม่มีเซิร์ฟว่างสำหรับเทเลพอร์ต")
+
+    local attempt = 0
+    while not alreadyTeleported do
+        attempt += 1
+        local jobId = getRandomJobId()
+        if jobId then
+            print("🚀 [ครั้งที่ " .. attempt .. "] กำลังเทเลพอร์ตไป JobId: " .. jobId)
+            local success, err = pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
+            end)
+
+            if success then
+                print("✅ เทเลพอร์ตเรียบร้อย (อาจต้องรอโหลด)")
+                alreadyTeleported = true
+                break
+            else
+                print("❌ เทเลพอร์ตล้มเหลว: " .. tostring(err))
+                task.wait(2)
+            end
+        else
+            print("⚠️ ไม่มี JobId ใหม่ ลองใหม่อีกครั้งใน 3 วินาที")
+            task.wait(3)
+        end
     end
 end
 
