@@ -70,10 +70,7 @@ local function getRandomJobId()
 end
 
 local function teleportToNewServer()
-    if alreadyTeleported then
-        print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
-        return
-    end
+    if alreadyTeleported then return end
     alreadyTeleported = true
 
     while true do
@@ -90,13 +87,14 @@ local function teleportToNewServer()
         end)
 
         if success then
-            print("✅ เรียกเทเลพอร์ตสำเร็จ (กำลังโหลด...)")
+            print("✅ เรียก Teleport สำเร็จ (กำลังโหลด...)")
             break
         else
             warn("❌ เทเลพอร์ตล้มเหลว: " .. tostring(err))
             if tostring(err):find("Unauthorized") then
-                print("⚠️ เซิร์ฟเวอร์เข้าไม่ได้ (Unauthorized), ลองใหม่ใน 5 วินาที...")
-                task.wait(5)
+                print("⚠️ JobId เข้าไม่ได้ (Unauthorized), ข้ามและสุ่มใหม่...")
+                task.wait(2)
+                continue
             else
                 print("❗ พบข้อผิดพลาดอื่น ลองใหม่ใน 5 วินาที...")
                 task.wait(5)
@@ -104,6 +102,7 @@ local function teleportToNewServer()
         end
     end
 end
+
 
 task.spawn(function()
     while not alreadyTeleported do
