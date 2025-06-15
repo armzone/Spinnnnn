@@ -8,7 +8,7 @@ local checkInterval = 30
 local firebaseUrl = "https://jobid-1e3dc-default-rtdb.asia-southeast1.firebasedatabase.app/roblox_servers.json"
 
 local killedByPlayerCount = 0
-local maxPlayerKills = 2
+local maxPlayerKills = 1
 local alreadyTeleported = false
 
 print("📌 สคริปต์เริ่มทำงาน")
