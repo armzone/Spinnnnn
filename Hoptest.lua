@@ -34,17 +34,19 @@ local function checkIfKilledByOtherPlayer(text)
         end
     end
 
-    -- ตรวจหาคำที่เป็นเลขล้วน
-    for word in string.gmatch(text, "%S+") do
-        if isNumericName(word) then
-            print("💥 พบชื่อเป็นตัวเลขล้วน:", word)
-            return true, word
+    -- ✅ ตรวจหาคำที่เป็นตัวเลขล้วน แม้จะมี '-' หรือคำอื่นนำหน้า
+    for word in string.gmatch(text, "[^%s%-]+") do
+        local cleanedWord = word:gsub("[^%d]", "") -- เอาสัญลักษณ์ที่ไม่ใช่ตัวเลขออก
+        if isNumericName(cleanedWord) and #cleanedWord >= 6 then -- ป้องกัน false positive จากเลขสั้น ๆ
+            print("💥 พบชื่อเป็นตัวเลขล้วน:", cleanedWord)
+            return true, cleanedWord
         end
     end
 
     print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
     return false
 end
+
 
 -- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
 local function getRandomJobId()
