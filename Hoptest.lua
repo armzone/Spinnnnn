@@ -13,6 +13,16 @@ local alreadyTeleported = false
 
 print("📌 สคริปต์เริ่มทำงาน")
 
+-- ✅ ฟัง Event เมื่อล้มเหลวในการ Teleport (เช่น Error 773)
+TeleportService.TeleportInitFailed:Connect(function(failedPlayer, teleportResult, errorMessage)
+    if failedPlayer == player and not alreadyTeleported then
+        warn("❌ TeleportInitFailed:", teleportResult, errorMessage)
+        task.delay(2, function()
+            teleportToNewServer()
+        end)
+    end
+end)
+
 -- ✅ ตรวจว่า string เป็นตัวเลขล้วน
 local function isNumericName(name)
     return name:match("^%d+$") ~= nil
@@ -34,10 +44,9 @@ local function checkIfKilledByOtherPlayer(text)
         end
     end
 
-    -- ✅ ตรวจหาคำที่เป็นตัวเลขล้วน แม้จะมี '-' หรือคำอื่นนำหน้า
     for word in string.gmatch(text, "[^%s%-]+") do
-        local cleanedWord = word:gsub("[^%d]", "") -- เอาสัญลักษณ์ที่ไม่ใช่ตัวเลขออก
-        if isNumericName(cleanedWord) and #cleanedWord >= 6 then -- ป้องกัน false positive จากเลขสั้น ๆ
+        local cleanedWord = word:gsub("[^%d]", "")
+        if isNumericName(cleanedWord) and #cleanedWord >= 6 then
             print("💥 พบชื่อเป็นตัวเลขล้วน:", cleanedWord)
             return true, cleanedWord
         end
@@ -46,7 +55,6 @@ local function checkIfKilledByOtherPlayer(text)
     print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
     return false
 end
-
 
 -- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
 local function getRandomJobId()
@@ -75,8 +83,8 @@ local function getRandomJobId()
     return nil
 end
 
--- ✅ ฟังก์ชันเทเลพอร์ตซ้ำจนกว่าจะสำเร็จ
-local function teleportToNewServer()
+-- ✅ ฟังก์ชันเทเลพอร์ตซ้ำจนกว่าจะสำเร็จ (รอ Event ตัดสินผล)
+function teleportToNewServer()
     if alreadyTeleported then
         print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
         return
@@ -92,13 +100,12 @@ local function teleportToNewServer()
                 TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
             end)
 
-            if success then
-                print("✅ เทเลพอร์ตเรียบร้อย (อาจต้องรอโหลด)")
-                alreadyTeleported = true
-                break
-            else
-                print("❌ เทเลพอร์ตล้มเหลว: " .. tostring(err))
+            if not success then
+                print("❌ เทเลพอร์ตล้มเหลวทันที (pcall): " .. tostring(err))
                 task.wait(2)
+            else
+                print("⏳ ส่งคำสั่ง teleport แล้ว รอผลลัพธ์ (อาจสำเร็จหรือ fail โดย event)")
+                break -- รอผลจาก TeleportInitFailed แทน
             end
         else
             print("⚠️ ไม่มี JobId ใหม่ ลองใหม่อีกครั้งใน 3 วินาที")
