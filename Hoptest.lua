@@ -84,35 +84,48 @@ local function getRandomJobId()
 end
 
 -- ✅ ฟังก์ชันเทเลพอร์ตซ้ำจนกว่าจะสำเร็จ (รอ Event ตัดสินผล)
-function teleportToNewServer()
+local function teleportToNewServer()
     if alreadyTeleported then
         print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
         return
     end
 
     local attempt = 0
+
     while not alreadyTeleported do
         attempt += 1
         local jobId = getRandomJobId()
+
         if jobId then
-            print("🚀 [ครั้งที่ " .. attempt .. "] กำลังเทเลพอร์ตไป JobId: " .. jobId)
+            print("🚀 [ครั้งที่ " .. attempt .. "] พยายาม teleport ไป JobId: " .. jobId)
+
             local success, err = pcall(function()
                 TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
             end)
 
             if not success then
-                print("❌ เทเลพอร์ตล้มเหลวทันที (pcall): " .. tostring(err))
+                print("❌ pcall ล้มเหลว:", err)
                 task.wait(2)
             else
-                print("⏳ ส่งคำสั่ง teleport แล้ว รอผลลัพธ์ (อาจสำเร็จหรือ fail โดย event)")
-                break -- รอผลจาก TeleportInitFailed แทน
+                print("✅ ส่งคำสั่ง Teleport แล้ว (แต่ยังไม่ถือว่าสำเร็จ)")
+                -- 🔁 ตรวจทุก 5 วินาที ถ้ายังอยู่ในเซิร์ฟ แปลว่า teleport fail
+                local checkTime = 0
+                while checkTime < 10 do
+                    if alreadyTeleported then break end
+                    task.wait(1)
+                    checkTime += 1
+                end
+
+                -- ถ้ายังอยู่ → ลองใหม่
+                print("⚠️ ยังไม่ออกจากเซิร์ฟเวอร์เดิม ลอง teleport ใหม่")
             end
         else
-            print("⚠️ ไม่มี JobId ใหม่ ลองใหม่อีกครั้งใน 3 วินาที")
+            print("⚠️ ไม่มี JobId ให้เทเลพอร์ต ลองใหม่อีกครั้งใน 3 วิ")
             task.wait(3)
         end
     end
 end
+
 
 -- ✅ ลูปตรวจจับ GUI DeathMessage อย่างปลอดภัยและต่อเนื่อง
 task.spawn(function()
