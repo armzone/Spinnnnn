@@ -285,6 +285,7 @@ local function navigateToPosition(deltaTime)
     end
     
     local chassis = currentVehicle.chassis
+    local vehicleModel = currentVehicle.model
     local currentPosition = chassis.Position
     
     -- คำนวณทิศทางและระยะทาง
@@ -333,16 +334,21 @@ local function navigateToPosition(deltaTime)
         nextPosition = Vector3.new(nextPosition.X, groundY, nextPosition.Z)
     end
     
-    -- อัพเดท CFrame พร้อมทิศทางที่ถูกต้อง
+    -- คำนวณการหมุนหน้าไปยังเป้าหมาย
     local lookDirection = (targetPosition - nextPosition)
+    local newCFrame
     if lookDirection.Magnitude > 0 then
         -- ใช้เฉพาะแกน X และ Z สำหรับการหันหน้า
         lookDirection = Vector3.new(lookDirection.X, 0, lookDirection.Z).Unit
         local lookAtPosition = nextPosition + lookDirection
-        chassis.CFrame = CFrame.lookAt(nextPosition, lookAtPosition)
+        newCFrame = CFrame.lookAt(nextPosition, lookAtPosition)
     else
-        chassis.CFrame = CFrame.new(nextPosition)
+        newCFrame = CFrame.new(nextPosition)
     end
+    
+    -- เคลื่อนที่ทั้ง Model โดยใช้ SetPrimaryPartCFrame
+    vehicleModel.PrimaryPart = chassis
+    vehicleModel:SetPrimaryPartCFrame(newCFrame)
 end
 
 -- ฟังก์ชันเริ่มการนำทาง
