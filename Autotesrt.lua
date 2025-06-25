@@ -262,7 +262,8 @@ local function raycastGround(position)
     
     local raycastResult = workspace:Raycast(position, Vector3.new(0, -100, 0), raycastParams)
     if raycastResult then
-        return raycastResult.Position.Y + 1 -- ลดจาก 5 เป็น 1 studs
+        -- เพิ่มความสูงของรถ (ประมาณ 3 studs สำหรับมอเตอร์ไซค์)
+        return raycastResult.Position.Y + 3
     end
     return position.Y
 end
@@ -308,7 +309,8 @@ local function navigateToPosition(deltaTime)
     -- ตรวจสอบสิ่งกีดขวาง
     local obstacleHit = raycastObstacle(currentPosition, currentPosition + direction * 15)
     
-    local nextPosition = currentPosition + direction * (currentSpeed * deltaTime)
+    -- คำนวณตำแหน่งถัดไปพื้นฐาน (เคลื่อนที่ไปด้านหน้าเสมอ)
+    local baseNextPosition = currentPosition + direction * (currentSpeed * deltaTime)
     
     -- ถ้าเจอสิ่งกีดขวาง
     if obstacleHit then
@@ -317,8 +319,24 @@ local function navigateToPosition(deltaTime)
         
         -- ถ้าสิ่งกีดขวางสูงไม่เกิน 20 studs (รถมอเตอร์ไซค์กระโดดได้!)
         if (obstacleHeight - vehicleHeight) < 20 then
-            -- กระโดดข้ามสิ่งกีดขวาง
-            nextPosition = Vector3.new(nextPosition.X, obstacleHeight + 3, nextPosition.Z) -- ลดจาก 8 เป็น 3
+            -- กระโดดข้ามสิ่งกีดขวาง (แต่ยังคงเคลื่อนที่ไปด้านหน้า)
+            local nextPosition = Vector3.new(baseNextPosition.X, obstacleHeight + 5, baseNextPosition.Z)
+            
+            -- คำนวณการหมุนหน้าไปยังเป้าหมาย
+            local lookDirection = (targetPosition - nextPosition)
+            local newCFrame
+            if lookDirection.Magnitude > 0 then
+                lookDirection = Vector3.new(lookDirection.X, 0, lookDirection.Z).Unit
+                local lookAtPosition = nextPosition + lookDirection
+                newCFrame = CFrame.lookAt(nextPosition, lookAtPosition)
+            else
+                newCFrame = CFrame.new(nextPosition)
+            end
+            
+            -- เคลื่อนที่ทั้ง Model
+            vehicleModel.PrimaryPart = chassis
+            vehicleModel:SetPrimaryPartCFrame(newCFrame)
+            return
         else
             -- หยุดถ้าสิ่งกีดขวางสูงเกินไป
             isNavigating = false
@@ -328,11 +346,11 @@ local function navigateToPosition(deltaTime)
             end
             return
         end
-    else
-        -- ตรวจสอบพื้นผิว
-        local groundY = raycastGround(nextPosition)
-        nextPosition = Vector3.new(nextPosition.X, groundY, nextPosition.Z)
     end
+    
+    -- ไม่มีสิ่งกีดขวาง - ตรวจสอบพื้นผิวปกติ
+    local groundY = raycastGround(baseNextPosition)
+    local nextPosition = Vector3.new(baseNextPosition.X, groundY, baseNextPosition.Z)
     
     -- คำนวณการหมุนหน้าไปยังเป้าหมาย
     local lookDirection = (targetPosition - nextPosition)
