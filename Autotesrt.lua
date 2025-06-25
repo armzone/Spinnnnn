@@ -262,7 +262,7 @@ local function raycastGround(position)
     
     local raycastResult = workspace:Raycast(position, Vector3.new(0, -100, 0), raycastParams)
     if raycastResult then
-        return raycastResult.Position.Y + 5 -- สูงกว่าพื้น 5 studs
+        return raycastResult.Position.Y + 1 -- ลดจาก 5 เป็น 1 studs
     end
     return position.Y
 end
@@ -318,7 +318,7 @@ local function navigateToPosition(deltaTime)
         -- ถ้าสิ่งกีดขวางสูงไม่เกิน 20 studs (รถมอเตอร์ไซค์กระโดดได้!)
         if (obstacleHeight - vehicleHeight) < 20 then
             -- กระโดดข้ามสิ่งกีดขวาง
-            nextPosition = Vector3.new(nextPosition.X, obstacleHeight + 8, nextPosition.Z) -- เพิ่มความสูงเป็น 8
+            nextPosition = Vector3.new(nextPosition.X, obstacleHeight + 3, nextPosition.Z) -- ลดจาก 8 เป็น 3
         else
             -- หยุดถ้าสิ่งกีดขวางสูงเกินไป
             isNavigating = false
