@@ -5,7 +5,7 @@ local chatEvent = ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents"):
 
 -- Table เก็บข้อความที่พิมพ์บ่อยใน Blox Fruits
 local commonMessages = {
-    "ใครมี Hack Tool ขายบ้าง?",
+    "ใครมี Hack Tool บ้าง?",
     "หาคนช่วยเปิด Airdrop ที่ชายหาด",
     "ใครมีบ้านให้เช่าแถว Safe Zone?",
     "ขอทีมบุก ATM หลังร้าน The Butcher’s Cut",
@@ -23,7 +23,6 @@ local commonMessages = {
     "ขอทีมช่วยทำภารกิจลับ",
     "ใครมีเงินสดแลกเป็นของได้บ้าง?",
     "หาคนช่วยป้องกัน Airdrop จากศัตรู",
-    "ใครมีข้อมูลเกี่ยวกับการฟาร์มเงินเร็ว ๆ บ้าง?",
     "ขอเข้าร่วม Crew ที่มีประสบการณ์"
 }
 
