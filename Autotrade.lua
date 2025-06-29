@@ -277,20 +277,34 @@ local function updateMoney()
         return 0
     end)
     
-    -- อ่านเงินในธนาคาร (Bank Balance) - แก้ไข path
+    -- อ่านเงินในธนาคาร (Bank Balance) - ค้นหาจากเนื้อหาแทนชื่อ part
     local success2, bankBalance = pcall(function()
         -- หาเงินในธนาคารจาก GUI Options
         local optionsGui = playerGui:FindFirstChild("Options")
         if optionsGui then
-            -- ลองหาทุก TextLabel ที่มีข้อความ "Bank Balance"
+            -- ลองหาทุก TextLabel ที่มีข้อความ "Bank Balance" (ไม่สนใจชื่อ part)
             for _, child in pairs(optionsGui:GetDescendants()) do
-                if child:IsA("TextLabel") and child.Text and child.Text:find("Bank Balance") then
-                    local bankText = child.Text
-                    -- แปลง "Bank Balance: $200" เป็น 200
-                    local amount = bankText:match("Bank Balance:%s*%$([%d,]+)")
-                    if amount then
-                        local cleanBankText = amount:gsub(",", "")
-                        return tonumber(cleanBankText) or 0
+                if child:IsA("TextLabel") and child.Text then
+                    local text = tostring(child.Text)
+                    -- ตรวจหาข้อความที่มี "Bank Balance:" หรือ "Bank Balance" อยู่
+                    if text:find("Bank Balance") then
+                        -- แยกตัวเลขออกมาจากข้อความ
+                        local amount = text:match("Bank Balance:%s*%$?([%d,]+)")
+                        if not amount then
+                            -- ลองรูปแบบอื่น: "Bank Balance $200"
+                            amount = text:match("Bank Balance%s+%$?([%d,]+)")
+                        end
+                        if not amount then
+                            -- ลองรูปแบบอื่น: "$200" หลัง "Bank Balance"
+                            amount = text:match("Bank Balance.*%$([%d,]+)")
+                        end
+                        if amount then
+                            local cleanBankText = amount:gsub(",", "")
+                            local bankAmount = tonumber(cleanBankText)
+                            if bankAmount and bankAmount > 0 then
+                                return bankAmount
+                            end
+                        end
                     end
                 end
             end
