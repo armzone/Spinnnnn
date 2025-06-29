@@ -19,7 +19,7 @@ local lastTime = 0
 local navigationConnection = nil
 
 -- พิกัดสำคัญ
-local ATM_POSITION = Vector3.new(1255.526123046875, 255.31919718251953, -558.7059936523438)
+local ATM_POSITION = Vector3.new(1222.5396728515625, 258.4210205078125, -558.3889770507812)
 local FINAL_DESTINATION = Vector3.new(1167, 305, -592)
 
 -- ขั้นตอนการทำงาน
@@ -277,20 +277,19 @@ local function updateMoney()
         return 0
     end)
     
-    -- อ่านเงินในธนาคาร (Bank Balance)
+    -- อ่านเงินในธนาคาร (Bank Balance) - แก้ไข path
     local success2, bankBalance = pcall(function()
         -- หาเงินในธนาคารจาก GUI Options
         local optionsGui = playerGui:FindFirstChild("Options")
         if optionsGui then
-            local uiListLayout = optionsGui:FindFirstChild("UIListLayout")
-            if uiListLayout then
-                local title = optionsGui:FindFirstChild("Title")
-                if title then
-                    local bankLabel = title:FindFirstChild("7511") -- หา TextLabel ที่แสดง Bank Balance
-                    if bankLabel and bankLabel.Text then
-                        local bankText = bankLabel.Text
-                        -- แปลง "Bank Balance: $200" เป็น 200
-                        local cleanBankText = bankText:gsub("Bank Balance: %$", ""):gsub(",", "")
+            -- ลองหาทุก TextLabel ที่มีข้อความ "Bank Balance"
+            for _, child in pairs(optionsGui:GetDescendants()) do
+                if child:IsA("TextLabel") and child.Text and child.Text:find("Bank Balance") then
+                    local bankText = child.Text
+                    -- แปลง "Bank Balance: $200" เป็น 200
+                    local amount = bankText:match("Bank Balance:%s*%$([%d,]+)")
+                    if amount then
+                        local cleanBankText = amount:gsub(",", "")
                         return tonumber(cleanBankText) or 0
                     end
                 end
@@ -301,14 +300,18 @@ local function updateMoney()
     
     if success1 then
         handMoney = currentMoney
-        moneyLabel.Text = "💰 Hand Money: $" .. string.format("%,d", handMoney)
+        -- ใช้ tostring แทน string.format เพื่อหลีกเลี่ยง error
+        local handMoneyStr = tostring(handMoney):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+        moneyLabel.Text = "💰 Hand Money: $" .. handMoneyStr
     else
         moneyLabel.Text = "💰 Hand Money: Error reading"
     end
     
     if success2 then
         bankMoney = bankBalance
-        bankLabel.Text = "🏦 Bank Balance: $" .. string.format("%,d", bankMoney)
+        -- ใช้ tostring แทน string.format เพื่อหลีกเลี่ยง error
+        local bankMoneyStr = tostring(bankMoney):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+        bankLabel.Text = "🏦 Bank Balance: $" .. bankMoneyStr
     else
         bankLabel.Text = "🏦 Bank Balance: Error reading"
     end
@@ -439,7 +442,8 @@ local function autoFarmLoop()
         
         if needToWithdraw > 0 then
             if withdrawMoney(needToWithdraw) then
-                statusLabel.Text = "✅ Withdrew $" .. string.format("%,d", needToWithdraw)
+                local withdrawStr = tostring(needToWithdraw):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+                statusLabel.Text = "✅ Withdrew $" .. withdrawStr
                 wait(2)
             else
                 statusLabel.Text = "❌ Withdrawal failed"
