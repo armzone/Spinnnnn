@@ -1,76 +1,139 @@
--- Navigation System V2 - Locked Destination LocalScript
+-- Auto Farm System V3 LocalScript
 -- วางไฟล์นี้ใน StarterPlayer > StarterPlayerScripts
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- ตัวแปรสำหรับระบบนำทาง
-local isNavigating = false
-local targetPosition = Vector3.new(1167, 305, -592) -- ล็อคพิกัดเป้าหมาย
-local currentSpeed = 25
+-- ตัวแปรสำหรับระบบ Auto Farm
+local isRunning = false
+local currentStep = 1
+local targetWithdraw = 140000
+local currentSpeed = 35
 local connection = nil
 local lastTime = 0
+local navigationConnection = nil
+
+-- พิกัดสำคัญ
+local ATM_POSITION = Vector3.new(1255.526123046875, 255.31919718251953, -558.7059936523438)
+local FINAL_DESTINATION = Vector3.new(1167, 305, -592)
+
+-- ขั้นตอนการทำงาน
+local STEPS = {
+    [1] = "Going to ATM...",
+    [2] = "Withdrawing money...",
+    [3] = "Going to destination...",
+    [4] = "Waiting for respawn..."
+}
 
 -- สร้าง GUI
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "NavigationV2GUI"
+screenGui.Name = "AutoFarmV3GUI"
 screenGui.Parent = playerGui
 
 -- Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 300, 0, 180)
+mainFrame.Size = UDim2.new(0, 350, 0, 300)
 mainFrame.Position = UDim2.new(0, 10, 0, 10)
-mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 
--- Corner รูปแบบมุมโค้ง
 local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
+corner.CornerRadius = UDim.new(0, 10)
 corner.Parent = mainFrame
 
 -- Title
 local title = Instance.new("TextLabel")
 title.Name = "Title"
-title.Size = UDim2.new(1, 0, 0, 30)
+title.Size = UDim2.new(1, 0, 0, 35)
 title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "Navigation V2 - Auto Destination"
+title.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+title.Text = "🤖 Auto Farm System V3"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextScaled = true
 title.Font = Enum.Font.SourceSansBold
 title.Parent = mainFrame
 
--- Locked Position Display
-local positionLabel = Instance.new("TextLabel")
-positionLabel.Name = "PositionLabel"
-positionLabel.Size = UDim2.new(1, -20, 0, 25)
-positionLabel.Position = UDim2.new(0, 10, 0, 35)
-positionLabel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-positionLabel.BorderSizePixel = 0
-positionLabel.Text = "🎯 Destination: 1167, 305, -592"
-positionLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-positionLabel.TextScaled = true
-positionLabel.Font = Enum.Font.SourceSansBold
-positionLabel.TextXAlignment = Enum.TextXAlignment.Center
-positionLabel.Parent = mainFrame
+local titleCorner = Instance.new("UICorner")
+titleCorner.CornerRadius = UDim.new(0, 10)
+titleCorner.Parent = title
 
-local positionCorner = Instance.new("UICorner")
-positionCorner.CornerRadius = UDim.new(0, 4)
-positionCorner.Parent = positionLabel
+-- Money Status
+local moneyLabel = Instance.new("TextLabel")
+moneyLabel.Name = "MoneyLabel"
+moneyLabel.Size = UDim2.new(1, -20, 0, 25)
+moneyLabel.Position = UDim2.new(0, 10, 0, 45)
+moneyLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+moneyLabel.BorderSizePixel = 0
+moneyLabel.Text = "💰 Hand Money: $0"
+moneyLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+moneyLabel.TextScaled = true
+moneyLabel.Font = Enum.Font.SourceSansBold
+moneyLabel.Parent = mainFrame
+
+local moneyCorner = Instance.new("UICorner")
+moneyCorner.CornerRadius = UDim.new(0, 5)
+moneyCorner.Parent = moneyLabel
+
+-- Bank Balance Status
+local bankLabel = Instance.new("TextLabel")
+bankLabel.Name = "BankLabel"
+bankLabel.Size = UDim2.new(1, -20, 0, 25)
+bankLabel.Position = UDim2.new(0, 10, 0, 75)
+bankLabel.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+bankLabel.BorderSizePixel = 0
+bankLabel.Text = "🏦 Bank Balance: $0"
+bankLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+bankLabel.TextScaled = true
+bankLabel.Font = Enum.Font.SourceSansBold
+bankLabel.Parent = mainFrame
+
+local bankCorner = Instance.new("UICorner")
+bankCorner.CornerRadius = UDim.new(0, 5)
+bankCorner.Parent = bankLabel
+
+-- Withdraw Amount
+local withdrawLabel = Instance.new("TextLabel")
+withdrawLabel.Name = "WithdrawLabel"
+withdrawLabel.Size = UDim2.new(0.4, 0, 0, 20)
+withdrawLabel.Position = UDim2.new(0, 10, 0, 110)
+withdrawLabel.BackgroundTransparency = 1
+withdrawLabel.Text = "Withdraw Amount:"
+withdrawLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+withdrawLabel.TextScaled = true
+withdrawLabel.Font = Enum.Font.SourceSans
+withdrawLabel.TextXAlignment = Enum.TextXAlignment.Left
+withdrawLabel.Parent = mainFrame
+
+local withdrawInput = Instance.new("TextBox")
+withdrawInput.Name = "WithdrawInput"
+withdrawInput.Size = UDim2.new(0.5, 0, 0, 25)
+withdrawInput.Position = UDim2.new(0.5, 0, 0, 107)
+withdrawInput.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+withdrawInput.BorderSizePixel = 0
+withdrawInput.Text = "140000"
+withdrawInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+withdrawInput.TextScaled = true
+withdrawInput.Font = Enum.Font.SourceSans
+withdrawInput.Parent = mainFrame
+
+local withdrawCorner = Instance.new("UICorner")
+withdrawCorner.CornerRadius = UDim.new(0, 4)
+withdrawCorner.Parent = withdrawInput
 
 -- Speed Control
 local speedLabel = Instance.new("TextLabel")
 speedLabel.Name = "SpeedLabel"
 speedLabel.Size = UDim2.new(1, -20, 0, 20)
-speedLabel.Position = UDim2.new(0, 10, 0, 70)
+speedLabel.Position = UDim2.new(0, 10, 0, 140)
 speedLabel.BackgroundTransparency = 1
-speedLabel.Text = "Speed: 25"
+speedLabel.Text = "Speed: 35"
 speedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 speedLabel.TextScaled = true
 speedLabel.Font = Enum.Font.SourceSans
@@ -80,7 +143,7 @@ speedLabel.Parent = mainFrame
 local speedSlider = Instance.new("TextButton")
 speedSlider.Name = "SpeedSlider"
 speedSlider.Size = UDim2.new(1, -20, 0, 20)
-speedSlider.Position = UDim2.new(0, 10, 0, 95)
+speedSlider.Position = UDim2.new(0, 10, 0, 165)
 speedSlider.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
 speedSlider.BorderSizePixel = 0
 speedSlider.Text = ""
@@ -92,7 +155,7 @@ sliderCorner.Parent = speedSlider
 
 local sliderFill = Instance.new("Frame")
 sliderFill.Name = "Fill"
-sliderFill.Size = UDim2.new(0.44, 0, 1, 0) -- (25-5)/(50-5) = 0.44
+sliderFill.Size = UDim2.new(0.66, 0, 1, 0) -- (35-5)/(50-5) = 0.66
 sliderFill.Position = UDim2.new(0, 0, 0, 0)
 sliderFill.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
 sliderFill.BorderSizePixel = 0
@@ -102,40 +165,61 @@ local fillCorner = Instance.new("UICorner")
 fillCorner.CornerRadius = UDim.new(0, 4)
 fillCorner.Parent = sliderFill
 
--- Start/Stop Buttons
+-- Status Display
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "StatusLabel"
+statusLabel.Size = UDim2.new(1, -20, 0, 25)
+statusLabel.Position = UDim2.new(0, 10, 0, 195)
+statusLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+statusLabel.BorderSizePixel = 0
+statusLabel.Text = "⏸️ Ready to start"
+statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+statusLabel.TextScaled = true
+statusLabel.Font = Enum.Font.SourceSansBold
+statusLabel.Parent = mainFrame
+
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 5)
+statusCorner.Parent = statusLabel
+
+-- Start/Stop Button
 local startButton = Instance.new("TextButton")
 startButton.Name = "StartButton"
-startButton.Size = UDim2.new(0.45, 0, 0, 30)
-startButton.Position = UDim2.new(0, 10, 0, 125)
-startButton.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+startButton.Size = UDim2.new(1, -20, 0, 40)
+startButton.Position = UDim2.new(0, 10, 0, 230)
+startButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
 startButton.BorderSizePixel = 0
-startButton.Text = "🚀 GO!"
+startButton.Text = "🚀 START AUTO FARM"
 startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 startButton.TextScaled = true
 startButton.Font = Enum.Font.SourceSansBold
 startButton.Parent = mainFrame
 
 local startCorner = Instance.new("UICorner")
-startCorner.CornerRadius = UDim.new(0, 4)
+startCorner.CornerRadius = UDim.new(0, 8)
 startCorner.Parent = startButton
 
-local stopButton = Instance.new("TextButton")
-stopButton.Name = "StopButton"
-stopButton.Size = UDim2.new(0.45, 0, 0, 30)
-stopButton.Position = UDim2.new(0.55, 0, 0, 125)
-stopButton.BackgroundColor3 = Color3.fromRGB(255, 59, 48)
-stopButton.BorderSizePixel = 0
-stopButton.Text = "❌ STOP"
-stopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-stopButton.TextScaled = true
-stopButton.Font = Enum.Font.SourceSansBold
-stopButton.Parent = mainFrame
+-- Reset Button
+local resetButton = Instance.new("TextButton")
+resetButton.Name = "ResetButton"
+resetButton.Size = UDim2.new(1, -20, 0, 25)
+resetButton.Position = UDim2.new(0, 10, 1, -35)
+resetButton.BackgroundColor3 = Color3.fromRGB(255, 149, 0)
+resetButton.BorderSizePixel = 0
+resetButton.Text = "🔄 RESET"
+resetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+resetButton.TextScaled = true
+resetButton.Font = Enum.Font.SourceSansBold
+resetButton.Parent = mainFrame
 
-local stopCorner = Instance.new("UICorner")
-stopCorner.CornerRadius = UDim.new(0, 4)
-stopCorner.Parent = stopButton
+local resetCorner = Instance.new("UICorner")
+resetCorner.CornerRadius = UDim.new(0, 4)
+resetCorner.Parent = resetButton
 
--- ฟังก์ชันสำหรับ Speed Slider (รองรับมือถือ)
+-- ปรับขนาด Frame ให้พอดีกับ element ใหม่
+mainFrame.Size = UDim2.new(0, 350, 0, 330)
+
+-- ฟังก์ชันสำหรับ Speed Slider
 local function updateSlider(input)
     local sliderPosition = speedSlider.AbsolutePosition
     local sliderSize = speedSlider.AbsoluteSize
@@ -149,7 +233,6 @@ end
 
 local dragging = false
 
--- รองรับทั้ง PC และมือถือ
 speedSlider.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
@@ -169,6 +252,70 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- ฟังก์ชันอัพเดทยอดเงิน
+local function updateMoney()
+    local handMoney = 0
+    local bankMoney = 0
+    
+    -- อ่านเงินในมือ (Hand Money)
+    local success1, currentMoney = pcall(function()
+        local topRightHud = playerGui:FindFirstChild("TopRightHud")
+        if topRightHud then
+            local holder = topRightHud:FindFirstChild("Holder")
+            if holder then
+                local frame = holder:FindFirstChild("Frame")
+                if frame and frame:FindFirstChild("Folder") then
+                    local moneyTextLabel = frame.Folder:FindFirstChild("MoneyTextLabel")
+                    if moneyTextLabel then
+                        local moneyText = moneyTextLabel.Text
+                        local cleanText = moneyText:gsub("[%$,]", "")
+                        return tonumber(cleanText) or 0
+                    end
+                end
+            end
+        end
+        return 0
+    end)
+    
+    -- อ่านเงินในธนาคาร (Bank Balance)
+    local success2, bankBalance = pcall(function()
+        -- หาเงินในธนาคารจาก GUI Options
+        local optionsGui = playerGui:FindFirstChild("Options")
+        if optionsGui then
+            local uiListLayout = optionsGui:FindFirstChild("UIListLayout")
+            if uiListLayout then
+                local title = optionsGui:FindFirstChild("Title")
+                if title then
+                    local bankLabel = title:FindFirstChild("7511") -- หา TextLabel ที่แสดง Bank Balance
+                    if bankLabel and bankLabel.Text then
+                        local bankText = bankLabel.Text
+                        -- แปลง "Bank Balance: $200" เป็น 200
+                        local cleanBankText = bankText:gsub("Bank Balance: %$", ""):gsub(",", "")
+                        return tonumber(cleanBankText) or 0
+                    end
+                end
+            end
+        end
+        return 0
+    end)
+    
+    if success1 then
+        handMoney = currentMoney
+        moneyLabel.Text = "💰 Hand Money: $" .. string.format("%,d", handMoney)
+    else
+        moneyLabel.Text = "💰 Hand Money: Error reading"
+    end
+    
+    if success2 then
+        bankMoney = bankBalance
+        bankLabel.Text = "🏦 Bank Balance: $" .. string.format("%,d", bankMoney)
+    else
+        bankLabel.Text = "🏦 Bank Balance: Error reading"
+    end
+    
+    return handMoney, bankMoney
+end
+
 -- ฟังก์ชันสำหรับ Raycast
 local function raycastGround(position)
     local character = player.Character
@@ -180,7 +327,7 @@ local function raycastGround(position)
     
     local raycastResult = workspace:Raycast(position, Vector3.new(0, -100, 0), raycastParams)
     if raycastResult then
-        return raycastResult.Position.Y + 5 -- สูงกว่าพื้น 5 studs
+        return raycastResult.Position.Y + 5
     end
     return position.Y
 end
@@ -189,7 +336,7 @@ local function raycastObstacle(from, to)
     local character = player.Character
     if not character then return nil end
     
-    local direction = (to - from).Unit * 10 -- ตรวจสอบ 10 studs ข้างหน้า
+    local direction = (to - from).Unit * 10
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.FilterDescendantsInstances = {character}
@@ -198,126 +345,200 @@ local function raycastObstacle(from, to)
     return raycastResult
 end
 
--- ฟังก์ชันหลักสำหรับการนำทาง
-local function navigateToPosition(deltaTime)
+-- ฟังก์ชันนำทาง
+local function navigateToPosition(targetPos, deltaTime)
     local character = player.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
-        return
+        return false
     end
     
     local humanoidRootPart = character.HumanoidRootPart
     local currentPosition = humanoidRootPart.Position
     
-    -- คำนวณทิศทางและระยะทาง
-    local direction = (targetPosition - currentPosition)
+    local direction = (targetPos - currentPosition)
     local distance = direction.Magnitude
     
     -- ถ้าถึงจุดหมายแล้ว
-    if distance < 3 then
-        isNavigating = false
-        if connection then
-            connection:Disconnect()
-            connection = nil
-        end
-        -- แจ้งเตือนเมื่อถึงจุดหมาย
-        startButton.Text = "✅ ARRIVED!"
-        startButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-        wait(2)
-        startButton.Text = "🚀 GO!"
-        startButton.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-        return
+    if distance < 5 then
+        return true -- ถึงแล้ว
     end
     
-    -- อัพเดทระยะทางบน UI
-    local distanceText = math.floor(distance) .. " studs away"
-    positionLabel.Text = "🎯 Destination: 1167, 305, -592 (" .. distanceText .. ")"
-    
-    -- ปรับทิศทางให้เป็น Unit Vector
     direction = direction.Unit
-    
-    -- ตรวจสอบสิ่งกีดขวาง
     local obstacleHit = raycastObstacle(currentPosition, currentPosition + direction * 10)
-    
     local nextPosition = currentPosition + direction * (currentSpeed * deltaTime)
     
-    -- ถ้าเจอสิ่งกีดขวาง
     if obstacleHit then
         local obstacleHeight = obstacleHit.Position.Y
         local characterHeight = currentPosition.Y
         
-        -- ถ้าสิ่งกีดขวางสูงไม่เกิน 20 studs
         if (obstacleHeight - characterHeight) < 20 then
-            -- กระโดดข้ามสิ่งกีดขวาง
             nextPosition = Vector3.new(nextPosition.X, obstacleHeight + 5, nextPosition.Z)
         else
-            -- หยุดถ้าสิ่งกีดขวางสูงเกินไป
-            isNavigating = false
-            if connection then
-                connection:Disconnect()
-                connection = nil
-            end
-            return
+            return false -- ไม่สามารถผ่านได้
         end
     else
-        -- ตรวจสอบพื้นผิว
         local groundY = raycastGround(nextPosition)
         nextPosition = Vector3.new(nextPosition.X, groundY, nextPosition.Z)
     end
     
-    -- อัพเดท CFrame พร้อมทิศทางที่ถูกต้อง
-    local lookDirection = (targetPosition - nextPosition)
+    local lookDirection = (targetPos - nextPosition)
     if lookDirection.Magnitude > 0 then
-        -- ใช้เฉพาะแกน X และ Z สำหรับการหันหน้า
         lookDirection = Vector3.new(lookDirection.X, 0, lookDirection.Z).Unit
         local lookAtPosition = nextPosition + lookDirection
         humanoidRootPart.CFrame = CFrame.lookAt(nextPosition, lookAtPosition)
     else
         humanoidRootPart.CFrame = CFrame.new(nextPosition)
     end
+    
+    return false -- ยังไม่ถึง
 end
 
--- ฟังก์ชันเริ่มการนำทาง
-local function startNavigation()
-    if isNavigating then return end
-    
-    -- ตรวจสอบว่ามีตัวละครหรือไม่
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then
-        warn("Character not found!")
-        return
-    end
-    
-    isNavigating = true
-    lastTime = tick()
-    
-    -- อัพเดท UI
-    startButton.Text = "🏃‍♂️ GOING..."
-    startButton.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
-    
-    -- เริ่ม RunService connection พร้อม delta time
-    connection = RunService.Heartbeat:Connect(function()
-        local currentTime = tick()
-        local deltaTime = currentTime - lastTime
-        lastTime = currentTime
-        
-        navigateToPosition(deltaTime)
+-- ฟังก์ชันถอนเงิน
+local function withdrawMoney(amount)
+    local success, result = pcall(function()
+        local remote = ReplicatedStorage.Remotes.Get
+        local arguments = {
+            [1] = 7,
+            [2] = "transfer_funds",
+            [3] = "bank",
+            [4] = "hand",
+            [5] = amount
+        }
+        return remote:InvokeServer(unpack(arguments))
     end)
+    
+    return success
 end
 
--- ฟังก์ชันหยุดการนำทาง
-local function stopNavigation()
-    isNavigating = false
+-- ฟังก์ชันหลักของ Auto Farm
+local function autoFarmLoop()
+    if not isRunning then return end
+    
+    local currentTime = tick()
+    local deltaTime = currentTime - lastTime
+    lastTime = currentTime
+    
+    if currentStep == 1 then
+        -- ไปยัง ATM
+        statusLabel.Text = "🏃‍♂️ " .. STEPS[1]
+        statusLabel.BackgroundColor3 = Color3.fromRGB(255, 165, 0)
+        
+        if navigateToPosition(ATM_POSITION, deltaTime) then
+            currentStep = 2
+            wait(1) -- รอเครื่องเสร็จ
+        end
+        
+    elseif currentStep == 2 then
+        -- ถอนเงิน
+        statusLabel.Text = "💰 " .. STEPS[2]
+        statusLabel.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
+        
+        targetWithdraw = tonumber(withdrawInput.Text) or 140000
+        local handMoney, bankMoney = updateMoney()
+        local needToWithdraw = math.max(0, targetWithdraw - handMoney)
+        
+        if needToWithdraw > 0 then
+            if withdrawMoney(needToWithdraw) then
+                statusLabel.Text = "✅ Withdrew $" .. string.format("%,d", needToWithdraw)
+                wait(2)
+            else
+                statusLabel.Text = "❌ Withdrawal failed"
+                wait(2)
+            end
+        else
+            statusLabel.Text = "✅ Already have enough money"
+            wait(1)
+        end
+        
+        currentStep = 3
+        
+    elseif currentStep == 3 then
+        -- ไปยังจุดหมาย
+        statusLabel.Text = "🎯 " .. STEPS[3]
+        statusLabel.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+        
+        if navigateToPosition(FINAL_DESTINATION, deltaTime) then
+            currentStep = 4
+        end
+        
+    elseif currentStep == 4 then
+        -- รอ respawn
+        statusLabel.Text = "⏳ " .. STEPS[4]
+        statusLabel.BackgroundColor3 = Color3.fromRGB(255, 59, 48)
+        
+        -- ตรวจสอบว่า respawn หรือไม่
+        local character = player.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then
+            -- รอ respawn เสร็จ
+            wait(3)
+            currentStep = 1 -- เริ่มใหม่
+            statusLabel.Text = "🔄 Restarting cycle..."
+        end
+    end
+end
+
+-- ฟังก์ชันเริ่ม/หยุด Auto Farm
+local function toggleAutoFarm()
+    if isRunning then
+        -- หยุด
+        isRunning = false
+        currentStep = 1
+        
+        if connection then
+            connection:Disconnect()
+            connection = nil
+        end
+        
+        startButton.Text = "🚀 START AUTO FARM"
+        startButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+        statusLabel.Text = "⏸️ Auto Farm stopped"
+        statusLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    else
+        -- เริ่ม
+        isRunning = true
+        lastTime = tick()
+        
+        connection = RunService.Heartbeat:Connect(autoFarmLoop)
+        
+        startButton.Text = "⏹️ STOP AUTO FARM"
+        startButton.BackgroundColor3 = Color3.fromRGB(255, 59, 48)
+        statusLabel.Text = "🤖 Auto Farm started!"
+        statusLabel.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    end
+end
+
+-- ฟังก์ชันรีเซ็ต
+local function resetSystem()
+    isRunning = false
+    currentStep = 1
+    
     if connection then
         connection:Disconnect()
         connection = nil
     end
     
-    -- รีเซ็ต UI
-    startButton.Text = "🚀 GO!"
-    startButton.BackgroundColor3 = Color3.fromRGB(0, 162, 255)
-    positionLabel.Text = "🎯 Destination: 1167, 305, -592"
+    startButton.Text = "🚀 START AUTO FARM"
+    startButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+    statusLabel.Text = "🔄 System reset"
+    statusLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 end
 
+-- อัพเดทเงินทุก 2 วินาที
+spawn(function()
+    while screenGui.Parent do
+        updateMoney()
+        wait(2)
+    end
+end)
+
 -- เชื่อม Events
-startButton.MouseButton1Click:Connect(startNavigation)
-stopButton.MouseButton1Click:Connect(stopNavigation)
+startButton.MouseButton1Click:Connect(toggleAutoFarm)
+resetButton.MouseButton1Click:Connect(resetSystem)
+
+-- ตรวจจับ Character Spawn
+player.CharacterAdded:Connect(function()
+    wait(2) -- รอให้ character โหลดเสร็จ
+    if isRunning and currentStep == 4 then
+        currentStep = 1 -- เริ่มรอบใหม่
+    end
+end)
