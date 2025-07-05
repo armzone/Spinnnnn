@@ -1,3 +1,8 @@
+if game.PlaceId ~= 104715542330896 then
+    warn("❌ ไม่ใช่แมพที่กำหนด สคริปต์จะไม่ทำงาน")
+    return
+end
+
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
