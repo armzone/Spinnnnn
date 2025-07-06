@@ -26,7 +26,7 @@ local Settings = {
     SimplifyMaterials = true,
     
     -- Performance Settings
-    RenderDistance = 500,  -- ระยะการเรนเดอร์ (studs)
+    RenderDistance = 20,  -- ระยะการเรนเดอร์ (studs)
     RemoveDecals = true,
     RemoveTextures = false,  -- false = ยังเห็น texture แต่ลดคุณภาพ
     DisableGlobalShadows = true,
