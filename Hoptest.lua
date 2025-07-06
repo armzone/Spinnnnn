@@ -17,7 +17,7 @@ local maxPlayerKills = 1
 local alreadyTeleported = false
 
 -- ⏰ ตัวแปรสำหรับระบบการเปลี่ยนเซิร์ฟแบบจับเวลา
-local autoSwitchInterval = 20 * 60 -- 20 นาที (1200 วินาที)
+local autoSwitchInterval = 15 * 60 -- 20 นาที (1200 วินาที)
 local serverStartTime = tick()
 local lastSwitchTime = serverStartTime
 
