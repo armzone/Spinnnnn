@@ -28,7 +28,7 @@ local Settings = {
     -- Performance Settings
     RenderDistance = 20,  -- ระยะการเรนเดอร์ (studs)
     RemoveDecals = true,
-    RemoveTextures = false,  -- false = ยังเห็น texture แต่ลดคุณภาพ
+    RemoveTextures = true,  -- false = ยังเห็น texture แต่ลดคุณภาพ
     DisableGlobalShadows = true,
     SimplifyTerrain = true,
     
@@ -37,7 +37,7 @@ local Settings = {
     ReduceParticleCount = true,
     OptimizeLighting = true,
     RemoveFog = true,
-    DisableNeonGlow = false,  -- false = ยังเห็น neon แต่ลดเอฟเฟกต์
+    DisableNeonGlow = true,  -- false = ยังเห็น neon แต่ลดเอฟเฟกต์
     
     -- UI Settings
     ShowFPSCounter = true,
