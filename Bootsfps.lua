@@ -26,7 +26,7 @@ local Settings = {
     SimplifyMaterials = true,
     
     -- Performance Settings
-    RenderDistance = 20,  -- ระยะการเรนเดอร์ (studs)
+    RenderDistance = 500,  -- ระยะการเรนเดอร์ (studs)
     RemoveDecals = true,
     RemoveTextures = true,  -- false = ยังเห็น texture แต่ลดคุณภาพ
     DisableGlobalShadows = true,
@@ -38,6 +38,12 @@ local Settings = {
     OptimizeLighting = true,
     RemoveFog = true,
     DisableNeonGlow = true,  -- false = ยังเห็น neon แต่ลดเอฟเฟกต์
+    
+    -- Anti-Aliasing & Edge Settings
+    DisableAntiAliasing = true,  -- ปิด Anti-aliasing
+    SimplifyEdges = true,        -- ลดรอยหยักของขอบ
+    FlatShading = true,          -- ใช้การ shading แบบ flat
+    RemoveOutlines = true,       -- ลบเส้นขอบ
     
     -- UI Settings
     ShowFPSCounter = true,
@@ -142,6 +148,13 @@ local function OptimizeGraphics()
     pcall(function()
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
         settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
+        
+        -- ปิด Anti-Aliasing
+        if Settings.DisableAntiAliasing then
+            settings().Rendering.EnableFRM = false
+            settings().Rendering.FrameRateManager = 0
+            game:GetService("UserSettings").GameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+        end
     end)
     
     -- 4. Streaming Settings
@@ -182,6 +195,73 @@ local function OptimizePart(part)
         -- เก็บสีไว้แต่ลด brightness
         local h, s, v = part.Color:ToHSV()
         part.Color = Color3.fromHSV(h, s, v * 0.8)
+    end
+    
+    -- ลดรอยหยักและปรับ Edges
+    if Settings.SimplifyEdges then
+        -- ปิด Outlines
+        if part:FindFirstChildOfClass("SelectionBox") or 
+           part:FindFirstChildOfClass("Highlight") then
+            for _, outline in pairs(part:GetChildren()) do
+                if outline:IsA("SelectionBox") or outline:IsA("Highlight") then
+                    outline:Destroy()
+                end
+            end
+        end
+        
+        -- ลด Mesh Detail สำหรับ MeshParts
+        if part:IsA("MeshPart") then
+            part.RenderFidelity = Enum.RenderFidelity.Performance
+            part.CollisionFidelity = Enum.CollisionFidelity.Box
+        end
+        
+        -- ปรับ Surface Type เป็น Smooth
+        if Settings.FlatShading then
+            part.TopSurface = Enum.SurfaceType.Smooth
+            part.BottomSurface = Enum.SurfaceType.Smooth
+            part.LeftSurface = Enum.SurfaceType.Smooth
+            part.RightSurface = Enum.SurfaceType.Smooth
+            part.FrontSurface = Enum.SurfaceType.Smooth
+            part.BackSurface = Enum.SurfaceType.Smooth
+        end
+    end
+end
+
+-- 🎨 ฟังก์ชันเพิ่มเติมสำหรับลดรอยหยัก
+local function OptimizeEdgesAndAliasing()
+    -- ปรับ Mesh Detail Level
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("MeshPart") then
+            -- ใช้ LOD ต่ำสุด
+            obj.RenderFidelity = Enum.RenderFidelity.Performance
+            
+            -- ใช้ Collision แบบ Box (เร็วที่สุด)
+            obj.CollisionFidelity = Enum.CollisionFidelity.Box
+        elseif obj:IsA("UnionOperation") then
+            -- ปรับ Union operations
+            obj.RenderFidelity = Enum.RenderFidelity.Performance
+            obj.CollisionFidelity = Enum.CollisionFidelity.Box
+        elseif obj:IsA("SpecialMesh") and Settings.SimplifyEdges then
+            -- ลด Mesh Scale precision
+            local scale = obj.Scale
+            obj.Scale = Vector3.new(
+                math.floor(scale.X * 10) / 10,
+                math.floor(scale.Y * 10) / 10,
+                math.floor(scale.Z * 10) / 10
+            )
+        end
+    end
+    
+    -- ลบ Selection Boxes และ Highlights ทั้งหมด
+    if Settings.RemoveOutlines then
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("SelectionBox") or 
+               obj:IsA("Highlight") or 
+               obj:IsA("SurfaceSelection") or
+               obj:IsA("SelectionSphere") then
+                obj:Destroy()
+            end
+        end
     end
 end
 
@@ -295,6 +375,9 @@ local function StartOptimization()
     
     print("🏞️ กำลังปรับแต่ง Terrain...")
     OptimizeTerrain()
+    
+    print("🎨 กำลังลดรอยหยักและ Anti-aliasing...")
+    OptimizeEdgesAndAliasing()
     
     print("👥 กำลังปรับแต่ง Characters...")
     for _, plr in pairs(Players:GetPlayers()) do
