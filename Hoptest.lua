@@ -335,7 +335,7 @@ task.spawn(function()
         local currentPlayers = #Players:GetPlayers()
         print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers)
 
-        if currentPlayers > 10 then
+        if currentPlayers > 15 then
             print("⚠️ ผู้เล่นเกิน 10 คน กำลังสุ่มเซิร์ฟใหม่...")
             teleportToNewServer("ผู้เล่นเกิน 10 คน")
             break
