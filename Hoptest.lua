@@ -1,3 +1,4 @@
+-- 🎮 Auto Server Hopper - ใช้กับเซิร์ฟเวอร์ Python Monitor
 if game.PlaceId ~= 104715542330896 then
     warn("❌ ไม่ใช่แมพที่กำหนด สคริปต์จะไม่ทำงาน")
     return
@@ -10,7 +11,10 @@ local player = Players.LocalPlayer
 
 local placeId = game.PlaceId
 local checkInterval = 30
-local firebaseUrl = "https://jobid-1e3dc-default-rtdb.asia-southeast1.firebasedatabase.app/roblox_servers.json"
+
+-- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor (แก้ไข IP ให้ตรงกับเครื่องที่รัน Python)
+local monitorServerUrl = "http://223.206.69.185:5000/api/roblox-servers"  -- 🔁 เปลี่ยน IP ให้ตรงกับเครื่องคุณ
+-- local monitorServerUrl = "http://localhost:5000/api/roblox-servers"  -- ใช้บรรทัดนี้ถ้ารันบนเครื่องเดียวกัน
 
 local killedByPlayerCount = 0
 local maxPlayerKills = 1
@@ -21,7 +25,8 @@ local autoSwitchInterval = 20 * 60 -- 20 นาที (1200 วินาที)
 local serverStartTime = tick()
 local lastSwitchTime = serverStartTime
 
-print("📌 สคริปต์เริ่มทำงาน")
+print("📌 สคริปต์เริ่มทำงาน (ใช้เซิร์ฟเวอร์ Python Monitor)")
+print("🌐 Monitor URL: " .. monitorServerUrl)
 print("⏰ จะเปลี่ยนเซิร์ฟเวอร์อัตโนมัติทุกๆ 20 นาที")
 
 -- 🎨 สร้าง UI แสดงเวลานับถอยหลัง
@@ -37,8 +42,8 @@ local function createTimerUI()
     -- สร้าง Frame หลัก
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "TimerFrame"
-    mainFrame.Size = UDim2.new(0, 300, 0, 80)
-    mainFrame.Position = UDim2.new(0.5, -150, 0, 20)
+    mainFrame.Size = UDim2.new(0, 350, 0, 100)
+    mainFrame.Position = UDim2.new(0.5, -175, 0, 20)
     mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     mainFrame.BackgroundTransparency = 0.3
     mainFrame.BorderSizePixel = 0
@@ -49,28 +54,13 @@ local function createTimerUI()
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = mainFrame
     
-    -- เพิ่มเงาให้ Frame
-    local shadow = Instance.new("Frame")
-    shadow.Name = "Shadow"
-    shadow.Size = UDim2.new(1, 6, 1, 6)
-    shadow.Position = UDim2.new(0, -3, 0, -3)
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.7
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = mainFrame.ZIndex - 1
-    shadow.Parent = mainFrame
-    
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 15)
-    shadowCorner.Parent = shadow
-    
     -- สร้าง TextLabel สำหรับหัวข้อ
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Name = "TitleLabel"
     titleLabel.Size = UDim2.new(1, 0, 0, 25)
     titleLabel.Position = UDim2.new(0, 0, 0, 5)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "🔄 Server Auto Switch"
+    titleLabel.Text = "🔄 Python Monitor Connection"
     titleLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
     titleLabel.TextSize = 14
     titleLabel.TextStrokeTransparency = 0
@@ -92,27 +82,25 @@ local function createTimerUI()
     timerLabel.Font = Enum.Font.GothamBold
     timerLabel.Parent = mainFrame
     
-    -- เพิ่มเอฟเฟกต์เรืองแสง
-    local function addGlowEffect(textLabel)
-        -- สร้างเงาเรืองแสงหลายชั้น
-        for i = 1, 3 do
-            local glowLabel = textLabel:Clone()
-            glowLabel.Name = "GlowEffect" .. i
-            glowLabel.TextTransparency = 0.7 - (i * 0.2)
-            glowLabel.TextColor3 = Color3.fromRGB(0, 150, 255)
-            glowLabel.TextSize = textLabel.TextSize + (i * 2)
-            glowLabel.ZIndex = textLabel.ZIndex - i
-            glowLabel.Parent = textLabel.Parent
-        end
-    end
+    -- สร้าง TextLabel สำหรับสถานะการเชื่อมต่อ
+    local statusLabel = Instance.new("TextLabel")
+    statusLabel.Name = "StatusLabel"
+    statusLabel.Size = UDim2.new(1, 0, 0, 20)
+    statusLabel.Position = UDim2.new(0, 0, 0, 75)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "🔗 กำลังเชื่อมต่อ..."
+    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    statusLabel.TextSize = 12
+    statusLabel.TextStrokeTransparency = 0
+    statusLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.Parent = mainFrame
     
-    addGlowEffect(timerLabel)
-    
-    return timerLabel, titleLabel
+    return timerLabel, titleLabel, statusLabel
 end
 
 -- สร้าง UI
-local timerLabel, titleLabel = createTimerUI()
+local timerLabel, titleLabel, statusLabel = createTimerUI()
 
 -- ✅ ฟังก์ชันแสดงเวลาที่เหลือ
 local function getTimeRemaining()
@@ -132,26 +120,35 @@ local function updateTimerUI()
             
             -- เปลี่ยนสีตามเวลาที่เหลือ
             if remaining <= 60 then
-                -- สีแดงเมื่อเหลือน้อยกว่า 1 นาที
                 timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
                 titleLabel.Text = "⚠️ Server Switch Soon!"
-                titleLabel.TextColor3 = Color3.fromRGB(255, 150, 150)
             elseif remaining <= 300 then
-                -- สีเหลืองเมื่อเหลือน้อยกว่า 5 นาที
                 timerLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-                titleLabel.Text = "⏰ Server Auto Switch"
-                titleLabel.TextColor3 = Color3.fromRGB(255, 220, 150)
+                titleLabel.Text = "⏰ Python Monitor Active"
             else
-                -- สีฟ้าปกติ
                 timerLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-                titleLabel.Text = "🔄 Server Auto Switch"
-                titleLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+                titleLabel.Text = "🔄 Python Monitor Connection"
             end
         else
             timerLabel.Text = "00:00"
             timerLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
             titleLabel.Text = "🚀 Switching Server..."
-            titleLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        end
+    end
+end
+
+-- ✅ ฟังก์ชันอัพเดตสถานะการเชื่อมต่อ
+local function updateConnectionStatus(status, serverCount)
+    if statusLabel then
+        if status == "connected" then
+            statusLabel.Text = "✅ เชื่อมต่อสำเร็จ | เซิร์ฟเวอร์: " .. (serverCount or 0)
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        elseif status == "error" then
+            statusLabel.Text = "❌ เชื่อมต่อล้มเหลว | ลองใหม่..."
+            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+        else
+            statusLabel.Text = "🔗 กำลังเชื่อมต่อ..."
+            statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
         end
     end
 end
@@ -166,7 +163,7 @@ local function printTimeStatus()
     end
 end
 
--- ✅ ฟัง Event เมื่อล้มเหลวในการ Teleport (เช่น Error 773)
+-- ✅ ฟัง Event เมื่อล้มเหลวในการ Teleport
 TeleportService.TeleportInitFailed:Connect(function(failedPlayer, teleportResult, errorMessage)
     if failedPlayer == player and not alreadyTeleported then
         warn("❌ TeleportInitFailed:", teleportResult, errorMessage)
@@ -181,7 +178,7 @@ local function isNumericName(name)
     return name:match("^%d+$") ~= nil
 end
 
--- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่น (รวมถึงชื่อเป็นเลขล้วน)
+-- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่น
 local function checkIfKilledByOtherPlayer(text)
     print("🔎 กำลังตรวจสอบข้อความ: " .. text)
     local textLower = text:lower()
@@ -209,34 +206,43 @@ local function checkIfKilledByOtherPlayer(text)
     return false
 end
 
--- ✅ ดึงข้อมูลจาก Firebase และสุ่ม JobId
+-- 🌐 ดึงข้อมูลจากเซิร์ฟเวอร์ Python Monitor และสุ่ม JobId
 local function getRandomJobId()
-    print("🌐 กำลังดึง JobId จาก Firebase...")
+    print("🌐 กำลังดึง JobId จากเซิร์ฟเวอร์ Python Monitor...")
+    updateConnectionStatus("connecting")
+    
     local success, response = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet(firebaseUrl))
+        return game:HttpGet(monitorServerUrl)
     end)
 
     if success and response then
+        local serverData = HttpService:JSONDecode(response)
         local serverList = {}
-        for _, serverData in pairs(response) do
-            if serverData.id and serverData.id ~= game.JobId then
-                table.insert(serverList, serverData.id)
-                print("✅ พบ JobId: " .. serverData.id)
+        
+        for _, serverInfo in pairs(serverData) do
+            if serverInfo.id and serverInfo.id ~= game.JobId then
+                table.insert(serverList, serverInfo.id)
+                print("✅ พบ JobId: " .. serverInfo.id .. " (ผู้เล่น: " .. serverInfo.playing .. "/" .. serverInfo.maxPlayers .. ", Ping: " .. serverInfo.ping .. ")")
             end
         end
+        
         if #serverList > 0 then
+            updateConnectionStatus("connected", #serverList)
             print("🔁 สุ่ม JobId ใหม่จากทั้งหมด: " .. #serverList)
             return serverList[math.random(1, #serverList)]
         else
+            updateConnectionStatus("error")
             warn("⚠️ ไม่มีเซิร์ฟอื่นที่ต่างจากปัจจุบัน")
         end
     else
-        warn("❌ ดึงข้อมูล Firebase ไม่สำเร็จ: " .. tostring(response))
+        updateConnectionStatus("error")
+        warn("❌ ดึงข้อมูลจากเซิร์ฟเวอร์ Python ไม่สำเร็จ: " .. tostring(response))
+        warn("💡 ตรวจสอบว่าเซิร์ฟเวอร์ Python ทำงานอยู่และ URL ถูกต้อง")
     end
     return nil
 end
 
--- ✅ ฟังก์ชันเทเลพอร์ตซ้ำจนกว่าจะสำเร็จ (รอ Event ตัดสินผล)
+-- ✅ ฟังก์ชันเทเลพอร์ตซ้ำจนกว่าจะสำเร็จ
 function teleportToNewServer(reason)
     if alreadyTeleported then
         print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
@@ -262,16 +268,13 @@ function teleportToNewServer(reason)
                 print("❌ pcall ล้มเหลว:", err)
                 task.wait(2)
             else
-                print("✅ ส่งคำสั่ง Teleport แล้ว (แต่ยังไม่ถือว่าสำเร็จ)")
-                -- 🔁 ตรวจทุก 5 วินาที ถ้ายังอยู่ในเซิร์ฟ แปลว่า teleport fail
+                print("✅ ส่งคำสั่ง Teleport แล้ว")
                 local checkTime = 0
                 while checkTime < 10 do
                     if alreadyTeleported then break end
                     task.wait(1)
                     checkTime += 1
                 end
-
-                -- ถ้ายังอยู่ → ลองใหม่
                 print("⚠️ ยังไม่ออกจากเซิร์ฟเวอร์เดิม ลอง teleport ใหม่")
             end
         else
@@ -281,7 +284,7 @@ function teleportToNewServer(reason)
     end
 end
 
--- ✅ ลูปตรวจจับ GUI DeathMessage อย่างปลอดภัยและต่อเนื่อง
+-- ✅ ลูปตรวจจับ GUI DeathMessage
 task.spawn(function()
     while not alreadyTeleported do
         local success, err = pcall(function()
@@ -314,7 +317,7 @@ task.spawn(function()
                         teleportToNewServer("ถูกผู้เล่นฆ่าเกินกำหนด")
                     end
                 else
-                    print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ (ไม่ถูกนับ)")
+                    print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ")
                 end
             end)
         end)
@@ -336,8 +339,8 @@ task.spawn(function()
         print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers)
 
         if currentPlayers > 12 then
-            print("⚠️ ผู้เล่นเกิน 10 คน กำลังสุ่มเซิร์ฟใหม่...")
-            teleportToNewServer("ผู้เล่นเกิน 10 คน")
+            print("⚠️ ผู้เล่นเกิน 12 คน กำลังสุ่มเซิร์ฟใหม่...")
+            teleportToNewServer("ผู้เล่นเกิน 12 คน")
             break
         else
             print("✅ ยังอยู่ในเซิร์ฟที่เหมาะสม")
@@ -346,7 +349,7 @@ task.spawn(function()
     end
 end)
 
--- ⏰ ลูปใหม่: ตรวจสอบเวลาและเปลี่ยนเซิร์ฟอัตโนมัติทุกๆ 20 นาที
+-- ⏰ ลูปตรวจสอบเวลาและเปลี่ยนเซิร์ฟอัตโนมัติ
 task.spawn(function()
     print("⏰ เริ่มระบบการเปลี่ยนเซิร์ฟแบบจับเวลา")
     
@@ -372,13 +375,45 @@ task.spawn(function()
     end
 end)
 
+-- ⏰ ลูปทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Python
+task.spawn(function()
+    print("🔗 เริ่มทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Python")
+    while not alreadyTeleported do
+        -- ทดสอบการเชื่อมต่อทุก 2 นาที
+        task.wait(120)
+        
+        local success, response = pcall(function()
+            return game:HttpGet(monitorServerUrl)
+        end)
+        
+        if success and response then
+            local serverData = HttpService:JSONDecode(response)
+            local serverCount = 0
+            for _ in pairs(serverData) do
+                serverCount = serverCount + 1
+            end
+            updateConnectionStatus("connected", serverCount)
+            print("🔗 การเชื่อมต่อเซิร์ฟเวอร์ Python ปกติ (" .. serverCount .. " เซิร์ฟเวอร์)")
+        else
+            updateConnectionStatus("error")
+            warn("⚠️ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Python ได้")
+        end
+    end
+end)
+
 -- ✅ แสดงสถานะเริ่มต้น
 print("🎯 ระบบทำงาน:")
 print("   - เปลี่ยนเซิร์ฟเมื่อถูกผู้เล่นฆ่าเกิน " .. maxPlayerKills .. " ครั้ง")
-print("   - เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน 10 คน")
+print("   - เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน 12 คน")
 print("   - เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ 20 นาที")
+print("   - ดึงข้อมูลเซิร์ฟเวอร์จาก Python Monitor")
 print("🎨 UI Timer แสดงอยู่ด้านบนหน้าจอแล้ว!")
+print("🌐 Monitor Server: " .. monitorServerUrl)
 printTimeStatus()
 
--- เริ่มอัพเดต UI ทันที
+-- เริ่มอัพเดต UI และทดสอบการเชื่อมต่อทันที
 updateTimerUI()
+task.spawn(function()
+    task.wait(2)
+    getRandomJobId() -- ทดสอบการเชื่อมต่อครั้งแรก
+end)
