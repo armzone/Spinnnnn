@@ -13,7 +13,7 @@ local placeId = game.PlaceId
 local checkInterval = 30
 
 -- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor (แก้ไข IP ให้ตรงกับเครื่องที่รัน Python)
-local monitorServerUrl = "http://armkung285.ddns.net:5000/api/roblox-servers"  -- 🔁 เปลี่ยน IP ให้ตรงกับเครื่องคุณ
+local monitorServerUrl = "http://185.84.161.87/api/roblox-servers"  -- 🔁 เปลี่ยน IP ให้ตรงกับเครื่องคุณ
 -- local monitorServerUrl = "http://localhost:5000/api/roblox-servers"  -- ใช้บรรทัดนี้ถ้ารันบนเครื่องเดียวกัน
 
 local killedByPlayerCount = 0
