@@ -1,8 +1,36 @@
 -- 🎮 Auto Server Hopper - ใช้กับเซิร์ฟเวอร์ Python Monitor
+-- 🔧 การตั้งค่าที่สามารถปรับได้ขณะทำงาน
 if game.PlaceId ~= 104715542330896 then
     warn("❌ ไม่ใช่แมพที่กำหนด สคริปต์จะไม่ทำงาน")
     return
 end
+
+-- 🌟 ตัวแปรที่สามารถปรับได้ผ่าน _G (เปลี่ยนได้ขณะทำงาน)
+_G.ServerHopperConfig = _G.ServerHopperConfig or {
+    -- ⏰ เวลาการเปลี่ยนเซิร์ฟอัตโนมัติ (นาที)
+    autoSwitchMinutes = 60,
+    
+    -- 💀 จำนวนครั้งที่ถูกผู้เล่นฆ่าก่อนเปลี่ยนเซิร์ฟ
+    maxPlayerKills = 1,
+    
+    -- 👥 จำนวนผู้เล่นสูงสุดในเซิร์ฟ
+    maxPlayersInServer = 15,
+    
+    -- ⏱️ ช่วงเวลาตรวจสอบผู้เล่น (วินาที)
+    playerCheckInterval = 30,
+    
+    -- 🔗 ช่วงเวลาทดสอบการเชื่อมต่อ Python Server (วินาที)
+    connectionTestInterval = 120,
+    
+    -- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor
+    monitorServerUrl = "http://185.84.161.87/api/roblox-servers",
+    
+    -- 🎨 การแสดงผล UI
+    showUI = true,
+    
+    -- 📊 การแสดงผลใน Console
+    verboseLogging = false
+}
 
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
@@ -10,28 +38,38 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
 local placeId = game.PlaceId
-local checkInterval = 30
-
--- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor (แก้ไข IP ให้ตรงกับเครื่องที่รัน Python)
-local monitorServerUrl = "http://185.84.161.87/api/roblox-servers"  -- 🔁 เปลี่ยน IP ให้ตรงกับเครื่องคุณ
--- local monitorServerUrl = "http://localhost:5000/api/roblox-servers"  -- ใช้บรรทัดนี้ถ้ารันบนเครื่องเดียวกัน
-
 local killedByPlayerCount = 0
-local maxPlayerKills = 1
 local alreadyTeleported = false
 
 -- ⏰ ตัวแปรสำหรับระบบการเปลี่ยนเซิร์ฟแบบจับเวลา
-local autoSwitchInterval = 20 * 60 -- 20 นาที (1200 วินาที)
 local serverStartTime = tick()
 local lastSwitchTime = serverStartTime
 
+-- 🎯 UI Elements
+local timerLabel, titleLabel, statusLabel, mainFrame
+
 print("📌 สคริปต์เริ่มทำงาน (ใช้เซิร์ฟเวอร์ Python Monitor)")
-print("🌐 Monitor URL: " .. monitorServerUrl)
-print("⏰ จะเปลี่ยนเซิร์ฟเวอร์อัตโนมัติทุกๆ 20 นาที")
+print("🔧 การตั้งค่าปัจจุบัน:")
+print("   ⏰ เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
+print("   💀 เปลี่ยนเซิร์ฟเมื่อถูกฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
+print("   👥 เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน: " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
+print("🌐 Monitor URL: " .. _G.ServerHopperConfig.monitorServerUrl)
+print("")
+print("💡 วิธีเปลี่ยนการตั้งค่าขณะทำงาน:")
+print("   _G.ServerHopperConfig.autoSwitchMinutes = 30  -- เปลี่ยนเป็น 30 นาที")
+print("   _G.ServerHopperConfig.maxPlayerKills = 3      -- เปลี่ยนเป็น 3 ครั้ง")
+print("   _G.ServerHopperConfig.maxPlayersInServer = 10 -- เปลี่ยนเป็น 10 คน")
+print("   _G.ServerHopperConfig.showUI = false          -- ซ่อน UI")
 
 -- 🎨 สร้าง UI แสดงเวลานับถอยหลัง
 local function createTimerUI()
+    if not _G.ServerHopperConfig.showUI then return end
+    
     local playerGui = player:WaitForChild("PlayerGui")
+    
+    -- ลบ UI เก่าถ้ามี
+    local existingUI = playerGui:FindFirstChild("ServerTimerUI")
+    if existingUI then existingUI:Destroy() end
     
     -- สร้าง ScreenGui
     local screenGui = Instance.new("ScreenGui")
@@ -40,10 +78,10 @@ local function createTimerUI()
     screenGui.ResetOnSpawn = false
     
     -- สร้าง Frame หลัก
-    local mainFrame = Instance.new("Frame")
+    mainFrame = Instance.new("Frame")
     mainFrame.Name = "TimerFrame"
-    mainFrame.Size = UDim2.new(0, 350, 0, 100)
-    mainFrame.Position = UDim2.new(0.5, -175, 0, 20)
+    mainFrame.Size = UDim2.new(0, 380, 0, 120)
+    mainFrame.Position = UDim2.new(0.5, -190, 0, 20)
     mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     mainFrame.BackgroundTransparency = 0.3
     mainFrame.BorderSizePixel = 0
@@ -55,7 +93,7 @@ local function createTimerUI()
     corner.Parent = mainFrame
     
     -- สร้าง TextLabel สำหรับหัวข้อ
-    local titleLabel = Instance.new("TextLabel")
+    titleLabel = Instance.new("TextLabel")
     titleLabel.Name = "TitleLabel"
     titleLabel.Size = UDim2.new(1, 0, 0, 25)
     titleLabel.Position = UDim2.new(0, 0, 0, 5)
@@ -69,12 +107,12 @@ local function createTimerUI()
     titleLabel.Parent = mainFrame
     
     -- สร้าง TextLabel สำหรับเวลานับถอยหลัง
-    local timerLabel = Instance.new("TextLabel")
+    timerLabel = Instance.new("TextLabel")
     timerLabel.Name = "TimerLabel"
     timerLabel.Size = UDim2.new(1, 0, 0, 40)
     timerLabel.Position = UDim2.new(0, 0, 0, 30)
     timerLabel.BackgroundTransparency = 1
-    timerLabel.Text = "20:00"
+    timerLabel.Text = _G.ServerHopperConfig.autoSwitchMinutes .. ":00"
     timerLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
     timerLabel.TextSize = 28
     timerLabel.TextStrokeTransparency = 0
@@ -83,7 +121,7 @@ local function createTimerUI()
     timerLabel.Parent = mainFrame
     
     -- สร้าง TextLabel สำหรับสถานะการเชื่อมต่อ
-    local statusLabel = Instance.new("TextLabel")
+    statusLabel = Instance.new("TextLabel")
     statusLabel.Name = "StatusLabel"
     statusLabel.Size = UDim2.new(1, 0, 0, 20)
     statusLabel.Position = UDim2.new(0, 0, 0, 75)
@@ -96,14 +134,26 @@ local function createTimerUI()
     statusLabel.Font = Enum.Font.Gotham
     statusLabel.Parent = mainFrame
     
-    return timerLabel, titleLabel, statusLabel
+    -- สร้าง TextLabel สำหรับการตั้งค่า
+    local configLabel = Instance.new("TextLabel")
+    configLabel.Name = "ConfigLabel"
+    configLabel.Size = UDim2.new(1, 0, 0, 20)
+    configLabel.Position = UDim2.new(0, 0, 0, 95)
+    configLabel.BackgroundTransparency = 1
+    configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
+    configLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    configLabel.TextSize = 10
+    configLabel.TextStrokeTransparency = 0
+    configLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    configLabel.Font = Enum.Font.Gotham
+    configLabel.Parent = mainFrame
+    
+    return timerLabel, titleLabel, statusLabel, configLabel
 end
-
--- สร้าง UI
-local timerLabel, titleLabel, statusLabel = createTimerUI()
 
 -- ✅ ฟังก์ชันแสดงเวลาที่เหลือ
 local function getTimeRemaining()
+    local autoSwitchInterval = _G.ServerHopperConfig.autoSwitchMinutes * 60 -- แปลงเป็นวินาที
     local elapsed = tick() - lastSwitchTime
     local remaining = autoSwitchInterval - elapsed
     local minutes = math.floor(remaining / 60)
@@ -113,48 +163,56 @@ end
 
 -- ✅ ฟังก์ชันอัพเดต UI เวลา
 local function updateTimerUI()
-    if timerLabel then
-        local minutes, seconds, remaining = getTimeRemaining()
-        if remaining > 0 then
-            timerLabel.Text = string.format("%02d:%02d", minutes, seconds)
-            
-            -- เปลี่ยนสีตามเวลาที่เหลือ
-            if remaining <= 60 then
-                timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-                titleLabel.Text = "⚠️ Server Switch Soon!"
-            elseif remaining <= 300 then
-                timerLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-                titleLabel.Text = "⏰ Python Monitor Active"
-            else
-                timerLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-                titleLabel.Text = "🔄 Python Monitor Connection"
-            end
+    if not _G.ServerHopperConfig.showUI or not timerLabel then return end
+    
+    local minutes, seconds, remaining = getTimeRemaining()
+    if remaining > 0 then
+        timerLabel.Text = string.format("%02d:%02d", minutes, seconds)
+        
+        -- เปลี่ยนสีตามเวลาที่เหลือ
+        if remaining <= 60 then
+            timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+            titleLabel.Text = "⚠️ Server Switch Soon!"
+        elseif remaining <= 300 then
+            timerLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+            titleLabel.Text = "⏰ Python Monitor Active"
         else
-            timerLabel.Text = "00:00"
-            timerLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-            titleLabel.Text = "🚀 Switching Server..."
+            timerLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
+            titleLabel.Text = "🔄 Python Monitor Connection"
         end
+    else
+        timerLabel.Text = "00:00"
+        timerLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
+        titleLabel.Text = "🚀 Switching Server..."
+    end
+    
+    -- อัพเดตข้อมูลการตั้งค่า
+    local configLabel = mainFrame:FindFirstChild("ConfigLabel")
+    if configLabel then
+        configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
     end
 end
 
 -- ✅ ฟังก์ชันอัพเดตสถานะการเชื่อมต่อ
 local function updateConnectionStatus(status, serverCount)
-    if statusLabel then
-        if status == "connected" then
-            statusLabel.Text = "✅ เชื่อมต่อสำเร็จ | เซิร์ฟเวอร์: " .. (serverCount or 0)
-            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-        elseif status == "error" then
-            statusLabel.Text = "❌ เชื่อมต่อล้มเหลว | ลองใหม่..."
-            statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-        else
-            statusLabel.Text = "🔗 กำลังเชื่อมต่อ..."
-            statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-        end
+    if not _G.ServerHopperConfig.showUI or not statusLabel then return end
+    
+    if status == "connected" then
+        statusLabel.Text = "✅ เชื่อมต่อสำเร็จ | เซิร์ฟเวอร์: " .. (serverCount or 0)
+        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    elseif status == "error" then
+        statusLabel.Text = "❌ เชื่อมต่อล้มเหลว | ลองใหม่..."
+        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    else
+        statusLabel.Text = "🔗 กำลังเชื่อมต่อ..."
+        statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     end
 end
 
 -- ✅ ฟังก์ชันแสดงสถานะเวลา (สำหรับ console)
 local function printTimeStatus()
+    if not _G.ServerHopperConfig.verboseLogging then return end
+    
     local minutes, seconds, remaining = getTimeRemaining()
     if remaining > 0 then
         print("⏰ เวลาที่เหลือก่อนเปลี่ยนเซิร์ฟ: " .. minutes .. " นาที " .. seconds .. " วินาที")
@@ -180,7 +238,9 @@ end
 
 -- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่น
 local function checkIfKilledByOtherPlayer(text)
-    print("🔎 กำลังตรวจสอบข้อความ: " .. text)
+    if _G.ServerHopperConfig.verboseLogging then
+        print("🔎 กำลังตรวจสอบข้อความ: " .. text)
+    end
     local textLower = text:lower()
 
     for _, otherPlayer in ipairs(Players:GetPlayers()) do
@@ -188,7 +248,9 @@ local function checkIfKilledByOtherPlayer(text)
             local nameLower = otherPlayer.Name:lower()
             local displayLower = otherPlayer.DisplayName:lower()
             if textLower:find(nameLower) or textLower:find(displayLower) then
-                print("💥 พบชื่อผู้เล่นในข้อความ:", otherPlayer.Name)
+                if _G.ServerHopperConfig.verboseLogging then
+                    print("💥 พบชื่อผู้เล่นในข้อความ:", otherPlayer.Name)
+                end
                 return true, otherPlayer.Name
             end
         end
@@ -197,22 +259,28 @@ local function checkIfKilledByOtherPlayer(text)
     for word in string.gmatch(text, "[^%s%-]+") do
         local cleanedWord = word:gsub("[^%d]", "")
         if isNumericName(cleanedWord) and #cleanedWord >= 6 then
-            print("💥 พบชื่อเป็นตัวเลขล้วน:", cleanedWord)
+            if _G.ServerHopperConfig.verboseLogging then
+                print("💥 พบชื่อเป็นตัวเลขล้วน:", cleanedWord)
+            end
             return true, cleanedWord
         end
     end
 
-    print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
+    if _G.ServerHopperConfig.verboseLogging then
+        print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
+    end
     return false
 end
 
 -- 🌐 ดึงข้อมูลจากเซิร์ฟเวอร์ Python Monitor และสุ่ม JobId
 local function getRandomJobId()
-    print("🌐 กำลังดึง JobId จากเซิร์ฟเวอร์ Python Monitor...")
+    if _G.ServerHopperConfig.verboseLogging then
+        print("🌐 กำลังดึง JobId จากเซิร์ฟเวอร์ Python Monitor...")
+    end
     updateConnectionStatus("connecting")
     
     local success, response = pcall(function()
-        return game:HttpGet(monitorServerUrl)
+        return game:HttpGet(_G.ServerHopperConfig.monitorServerUrl)
     end)
 
     if success and response then
@@ -222,13 +290,17 @@ local function getRandomJobId()
         for _, serverInfo in pairs(serverData) do
             if serverInfo.id and serverInfo.id ~= game.JobId then
                 table.insert(serverList, serverInfo.id)
-                print("✅ พบ JobId: " .. serverInfo.id .. " (ผู้เล่น: " .. serverInfo.playing .. "/" .. serverInfo.maxPlayers .. ", Ping: " .. serverInfo.ping .. ")")
+                if _G.ServerHopperConfig.verboseLogging then
+                    print("✅ พบ JobId: " .. serverInfo.id .. " (ผู้เล่น: " .. serverInfo.playing .. "/" .. serverInfo.maxPlayers .. ", Ping: " .. serverInfo.ping .. ")")
+                end
             end
         end
         
         if #serverList > 0 then
             updateConnectionStatus("connected", #serverList)
-            print("🔁 สุ่ม JobId ใหม่จากทั้งหมด: " .. #serverList)
+            if _G.ServerHopperConfig.verboseLogging then
+                print("🔁 สุ่ม JobId ใหม่จากทั้งหมด: " .. #serverList)
+            end
             return serverList[math.random(1, #serverList)]
         else
             updateConnectionStatus("error")
@@ -305,19 +377,23 @@ task.spawn(function()
 
             deathMessage:GetPropertyChangedSignal("Text"):Connect(function()
                 local newText = deathMessage.Text
-                print("🔁 ตรวจพบข้อความใหม่: " .. newText)
+                if _G.ServerHopperConfig.verboseLogging then
+                    print("🔁 ตรวจพบข้อความใหม่: " .. newText)
+                end
 
                 local killed, killerName = checkIfKilledByOtherPlayer(newText)
                 if killed then
                     killedByPlayerCount += 1
                     print("💀 ถูกผู้เล่นฆ่าโดย: " .. killerName .. " (รวม " .. killedByPlayerCount .. " ครั้ง)")
 
-                    if killedByPlayerCount >= maxPlayerKills then
-                        print("⚠️ ถูกผู้เล่นฆ่าเกิน " .. maxPlayerKills .. " ครั้ง กำลังหาเซิร์ฟใหม่...")
+                    if killedByPlayerCount >= _G.ServerHopperConfig.maxPlayerKills then
+                        print("⚠️ ถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง กำลังหาเซิร์ฟใหม่...")
                         teleportToNewServer("ถูกผู้เล่นฆ่าเกินกำหนด")
                     end
                 else
-                    print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ")
+                    if _G.ServerHopperConfig.verboseLogging then
+                        print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ")
+                    end
                 end
             end)
         end)
@@ -333,25 +409,33 @@ end)
 
 -- ✅ ลูปตรวจสอบจำนวนผู้เล่นในเซิร์ฟ
 task.spawn(function()
-    print("📊 เริ่มลูปตรวจสอบจำนวนผู้เล่น")
+    if _G.ServerHopperConfig.verboseLogging then
+        print("📊 เริ่มลูปตรวจสอบจำนวนผู้เล่น")
+    end
     while not alreadyTeleported do
         local currentPlayers = #Players:GetPlayers()
-        print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers)
+        if _G.ServerHopperConfig.verboseLogging then
+            print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers)
+        end
 
-        if currentPlayers > 13 then
-            print("⚠️ ผู้เล่นเกิน 15 คน กำลังสุ่มเซิร์ฟใหม่...")
-            teleportToNewServer("ผู้เล่นเกิน 15 คน")
+        if currentPlayers > _G.ServerHopperConfig.maxPlayersInServer then
+            print("⚠️ ผู้เล่นเกิน " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน กำลังสุ่มเซิร์ฟใหม่...")
+            teleportToNewServer("ผู้เล่นเกิน " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
             break
         else
-            print("✅ ยังอยู่ในเซิร์ฟที่เหมาะสม")
+            if _G.ServerHopperConfig.verboseLogging then
+                print("✅ ยังอยู่ในเซิร์ฟที่เหมาะสม")
+            end
         end
-        wait(checkInterval)
+        wait(_G.ServerHopperConfig.playerCheckInterval)
     end
 end)
 
 -- ⏰ ลูปตรวจสอบเวลาและเปลี่ยนเซิร์ฟอัตโนมัติ
 task.spawn(function()
-    print("⏰ เริ่มระบบการเปลี่ยนเซิร์ฟแบบจับเวลา")
+    if _G.ServerHopperConfig.verboseLogging then
+        print("⏰ เริ่มระบบการเปลี่ยนเซิร์ฟแบบจับเวลา")
+    end
     
     while not alreadyTeleported do
         local minutes, seconds, remaining = getTimeRemaining()
@@ -366,8 +450,8 @@ task.spawn(function()
         
         -- ถ้าเวลาหมดแล้ว ให้เปลี่ยนเซิร์ฟ
         if remaining <= 0 then
-            print("⏰ ครบ 20 นาทีแล้ว! กำลังเปลี่ยนเซิร์ฟเวอร์...")
-            teleportToNewServer("ครบเวลา 20 นาทีตามกำหนด")
+            print("⏰ ครบ " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาทีแล้ว! กำลังเปลี่ยนเซิร์ฟเวอร์...")
+            teleportToNewServer("ครบเวลา " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาทีตามกำหนด")
             break
         end
         
@@ -377,13 +461,15 @@ end)
 
 -- ⏰ ลูปทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Python
 task.spawn(function()
-    print("🔗 เริ่มทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Python")
+    if _G.ServerHopperConfig.verboseLogging then
+        print("🔗 เริ่มทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Python")
+    end
     while not alreadyTeleported do
-        -- ทดสอบการเชื่อมต่อทุก 2 นาที
-        task.wait(120)
+        -- ทดสอบการเชื่อมต่อตามช่วงเวลาที่กำหนด
+        task.wait(_G.ServerHopperConfig.connectionTestInterval)
         
         local success, response = pcall(function()
-            return game:HttpGet(monitorServerUrl)
+            return game:HttpGet(_G.ServerHopperConfig.monitorServerUrl)
         end)
         
         if success and response then
@@ -393,7 +479,9 @@ task.spawn(function()
                 serverCount = serverCount + 1
             end
             updateConnectionStatus("connected", serverCount)
-            print("🔗 การเชื่อมต่อเซิร์ฟเวอร์ Python ปกติ (" .. serverCount .. " เซิร์ฟเวอร์)")
+            if _G.ServerHopperConfig.verboseLogging then
+                print("🔗 การเชื่อมต่อเซิร์ฟเวอร์ Python ปกติ (" .. serverCount .. " เซิร์ฟเวอร์)")
+            end
         else
             updateConnectionStatus("error")
             warn("⚠️ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Python ได้")
@@ -401,14 +489,77 @@ task.spawn(function()
     end
 end)
 
+-- 🔧 ฟังก์ชันสำหรับรีเซ็ตเวลานับถอยหลัง
+_G.resetServerTimer = function()
+    lastSwitchTime = tick()
+    print("🔄 รีเซ็ตเวลานับถอยหลังแล้ว")
+    if _G.ServerHopperConfig.showUI then
+        updateTimerUI()
+    end
+end
+
+-- 🔧 ฟังก์ชันสำหรับเปลี่ยนเซิร์ฟทันที
+_G.switchServerNow = function()
+    print("🚀 กำลังเปลี่ยนเซิร์ฟเวอร์ทันที...")
+    teleportToNewServer("คำสั่งเปลี่ยนเซิร์ฟทันที")
+end
+
+-- 🔧 ฟังก์ชันสำหรับแสดงการตั้งค่าปัจจุบัน
+_G.showConfig = function()
+    print("🔧 การตั้งค่าปัจจุบัน:")
+    print("   ⏰ เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
+    print("   💀 เปลี่ยนเซิร์ฟเมื่อถูกฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
+    print("   👥 เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน: " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
+    print("   ⏱️ ตรวจสอบผู้เล่นทุกๆ: " .. _G.ServerHopperConfig.playerCheckInterval .. " วินาที")
+    print("   🔗 ทดสอบการเชื่อมต่อทุกๆ: " .. _G.ServerHopperConfig.connectionTestInterval .. " วินาที")
+    print("   🌐 Monitor URL: " .. _G.ServerHopperConfig.monitorServerUrl)
+    print("   🎨 แสดง UI: " .. tostring(_G.ServerHopperConfig.showUI))
+    print("   📊 แสดงรายละเอียด: " .. tostring(_G.ServerHopperConfig.verboseLogging))
+end
+
+-- 🔧 ฟังก์ชันสำหรับรีเฟรช UI
+_G.refreshUI = function()
+    if _G.ServerHopperConfig.showUI then
+        createTimerUI()
+        print("🎨 รีเฟรช UI แล้ว")
+    else
+        -- ซ่อน UI
+        local playerGui = player:WaitForChild("PlayerGui")
+        local existingUI = playerGui:FindFirstChild("ServerTimerUI")
+        if existingUI then 
+            existingUI:Destroy() 
+            print("🎨 ซ่อน UI แล้ว")
+        end
+    end
+end
+
+-- สร้าง UI เริ่มต้น
+createTimerUI()
+
 -- ✅ แสดงสถานะเริ่มต้น
 print("🎯 ระบบทำงาน:")
-print("   - เปลี่ยนเซิร์ฟเมื่อถูกผู้เล่นฆ่าเกิน " .. maxPlayerKills .. " ครั้ง")
-print("   - เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน 15 คน")
-print("   - เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ 20 นาที")
+print("   - เปลี่ยนเซิร์ฟเมื่อถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
+print("   - เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
+print("   - เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
 print("   - ดึงข้อมูลเซิร์ฟเวอร์จาก Python Monitor")
-print("🎨 UI Timer แสดงอยู่ด้านบนหน้าจอแล้ว!")
-print("🌐 Monitor Server: " .. monitorServerUrl)
+if _G.ServerHopperConfig.showUI then
+    print("🎨 UI Timer แสดงอยู่ด้านบนหน้าจอแล้ว!")
+end
+print("🌐 Monitor Server: " .. _G.ServerHopperConfig.monitorServerUrl)
+print("")
+print("🔧 คำสั่งที่สามารถใช้ได้:")
+print("   _G.showConfig()          -- แสดงการตั้งค่าปัจจุบัน")
+print("   _G.resetServerTimer()    -- รีเซ็ตเวลานับถอยหลัง")
+print("   _G.switchServerNow()     -- เปลี่ยนเซิร์ฟเวอร์ทันที")
+print("   _G.refreshUI()           -- รีเฟรช UI")
+print("")
+print("💡 ตัวอย่างการเปลี่ยนการตั้งค่า:")
+print("   _G.ServerHopperConfig.autoSwitchMinutes = 30")
+print("   _G.ServerHopperConfig.maxPlayerKills = 3")
+print("   _G.ServerHopperConfig.maxPlayersInServer = 10")
+print("   _G.ServerHopperConfig.showUI = false")
+print("   _G.ServerHopperConfig.verboseLogging = false")
+print("   _G.refreshUI()  -- อัพเดต UI หลังเปลี่ยนการตั้งค่า")
 printTimeStatus()
 
 -- เริ่มอัพเดต UI และทดสอบการเชื่อมต่อทันที
