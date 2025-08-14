@@ -1,6 +1,6 @@
--- 🚀 Roblox FPS Booster Script
+-- 🚀 Roblox FPS Booster + Black Background Script
 -- 📌 ทำงานฝั่ง Local เท่านั้น
--- ✨ ปรับปรุงประสิทธิภาพและเพิ่ม FPS ในทุกแมพ
+-- ✨ ปรับปรุงประสิทธิภาพ เพิ่ม FPS และเปลี่ยนพื้นหลังเป็นสีดำ
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
@@ -10,12 +10,18 @@ local Debris = game:GetService("Debris")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local MaterialService = game:GetService("MaterialService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 
 -- 🎮 การตั้งค่า (ปรับได้ตามต้องการ)
 local Settings = {
+    -- Background Settings
+    EnableBlackBackground = true,
+    BlackTextureId = "rbxassetid://120717192726049", -- ID ที่คุณอัปโหลด
+    RemoveSkybox = true,  -- ลบ skybox เดิมทิ้ง
+    
     -- Graphics Settings
     RemoveShadows = true,
     RemoveBlur = true,
@@ -50,7 +56,73 @@ local Settings = {
     FPSCounterPosition = UDim2.new(0, 10, 0, 10)
 }
 
-print("🚀 FPS Booster Script เริ่มทำงาน...")
+print("🚀 FPS Booster + Black Background Script เริ่มทำงาน...")
+
+-- 🌌 ฟังก์ชันสำหรับเปลี่ยนพื้นหลังเป็นสีดำ
+local function SetBlackBackground()
+    if not Settings.EnableBlackBackground then return end
+    
+    print("🌌 กำลังเปลี่ยนพื้นหลังเป็นสีดำ...")
+    
+    -- ลบ skybox เดิมทั้งหมด
+    if Settings.RemoveSkybox then
+        for _, child in pairs(Lighting:GetChildren()) do
+            if child:IsA("Sky") then
+                child:Destroy()
+            end
+        end
+    end
+    
+    -- สร้าง skybox สีดำใหม่ (ถ้ามี texture ID)
+    if Settings.BlackTextureId and Settings.BlackTextureId ~= "" then
+        local sky = Instance.new("Sky")
+        sky.Name = "BlackSky"
+        
+        -- ใช้ texture สีดำที่อัปโหลด
+        sky.SkyboxBk = Settings.BlackTextureId
+        sky.SkyboxDn = Settings.BlackTextureId  
+        sky.SkyboxFt = Settings.BlackTextureId
+        sky.SkyboxLf = Settings.BlackTextureId
+        sky.SkyboxRt = Settings.BlackTextureId
+        sky.SkyboxUp = Settings.BlackTextureId
+        
+        sky.Parent = Lighting
+        print("✅ ใช้ texture สีดำ ID: " .. Settings.BlackTextureId)
+    else
+        print("✅ ลบ skybox ทั้งหมด - แสดง void สีดำ")
+    end
+    
+    -- ปรับ lighting ให้เข้มขึ้น
+    Lighting.Ambient = Color3.fromRGB(5, 5, 5) -- เข้มแต่ยังเห็นตัวละคร
+    Lighting.Brightness = 0.2
+    Lighting.OutdoorAmbient = Color3.fromRGB(5, 5, 5)
+    Lighting.ColorShift_Bottom = Color3.fromRGB(0, 0, 0)
+    Lighting.ColorShift_Top = Color3.fromRGB(0, 0, 0)
+    
+    print("✅ พื้นหลังสีดำพร้อมใช้งาน!")
+end
+
+-- 🌌 ฟังก์ชันสำหรับเปลี่ยนพื้นหลังแบบค่อยเป็นค่อยไป
+local function FadeToBlackBackground()
+    if not Settings.EnableBlackBackground then return end
+    
+    local tweenInfo = TweenInfo.new(2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+    
+    -- ค่อยๆ เปลี่ยน lighting
+    local lightingTween = TweenService:Create(Lighting, tweenInfo, {
+        Ambient = Color3.fromRGB(5, 5, 5),
+        Brightness = 0.2,
+        OutdoorAmbient = Color3.fromRGB(5, 5, 5),
+        ColorShift_Bottom = Color3.fromRGB(0, 0, 0),
+        ColorShift_Top = Color3.fromRGB(0, 0, 0)
+    })
+    
+    lightingTween:Play()
+    
+    -- เปลี่ยน skybox หลังจาก tween เริ่ม
+    task.wait(1)
+    SetBlackBackground()
+end
 
 -- 📊 สร้าง FPS Counter
 local screenGui, fpsLabel
@@ -116,7 +188,7 @@ local function OptimizeGraphics()
     if Settings.OptimizeLighting then
         Lighting.GlobalShadows = not Settings.DisableGlobalShadows
         Lighting.FogEnd = Settings.RemoveFog and 100000 or Lighting.FogEnd
-        Lighting.Brightness = 2
+        Lighting.Brightness = Settings.EnableBlackBackground and 0.2 or 2
         Lighting.ClockTime = 14
         Lighting.GeographicLatitude = 0
         Lighting.EnvironmentDiffuseScale = 0
@@ -367,6 +439,9 @@ end)
 
 -- 🚀 เริ่มการ Optimization
 local function StartOptimization()
+    print("🌌 กำลังเปลี่ยนพื้นหลังเป็นสีดำ...")
+    SetBlackBackground() -- หรือใช้ FadeToBlackBackground() สำหรับเอฟเฟกต์
+    
     print("⚙️ กำลังปรับแต่งการตั้งค่า Graphics...")
     OptimizeGraphics()
     
@@ -390,20 +465,20 @@ local function StartOptimization()
     
     -- แจ้งเตือนผู้เล่น
     game.StarterGui:SetCore("SendNotification", {
-        Title = "FPS Booster",
-        Text = "การปรับแต่งเสร็จสมบูรณ์! 🚀",
+        Title = "FPS Booster + Black BG",
+        Text = "การปรับแต่งเสร็จสมบูรณ์! 🚀🌌",
         Duration = 5,
         Icon = "rbxassetid://7733964719"
     })
 end
 
--- 🎮 คำสั่งพิเศษ (กด F9 เพื่อ toggle)
-local UserInputService = game:GetService("UserInputService")
+-- 🎮 คำสั่งพิเศษ
 local isOptimized = false
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
+    -- F9 = Toggle FPS Booster
     if input.KeyCode == Enum.KeyCode.F9 then
         isOptimized = not isOptimized
         
@@ -418,10 +493,39 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             })
         end
     end
+    
+    -- F8 = Toggle เฉพาะพื้นหลังสีดำ
+    if input.KeyCode == Enum.KeyCode.F8 then
+        Settings.EnableBlackBackground = not Settings.EnableBlackBackground
+        
+        if Settings.EnableBlackBackground then
+            FadeToBlackBackground()
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "Black Background",
+                Text = "เปิดใช้พื้นหลังสีดำ 🌌",
+                Duration = 3
+            })
+        else
+            -- ลบ skybox สีดำ
+            for _, child in pairs(Lighting:GetChildren()) do
+                if child:IsA("Sky") and child.Name == "BlackSky" then
+                    child:Destroy()
+                end
+            end
+            
+            game.StarterGui:SetCore("SendNotification", {
+                Title = "Black Background",
+                Text = "ปิดพื้นหลังสีดำ",
+                Duration = 3
+            })
+        end
+    end
 end)
 
 -- 🏁 เริ่มต้นทันที
 StartOptimization()
 
-print("✨ FPS Booster พร้อมใช้งาน!")
+print("✨ FPS Booster + Black Background พร้อมใช้งาน!")
 print("📌 กด F9 เพื่อ toggle การ optimization")
+print("📌 กด F8 เพื่อ toggle เฉพาะพื้นหลังสีดำ")
+print("🌌 Texture ID ที่ใช้: " .. Settings.BlackTextureId)
