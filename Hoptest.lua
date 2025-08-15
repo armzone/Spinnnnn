@@ -17,7 +17,7 @@ _G.ServerHopperConfig = _G.ServerHopperConfig or {
     killDelaySeconds = 15,
     
     -- 👥 จำนวนผู้เล่นสูงสุดในเซิร์ฟ
-    maxPlayersInServer = 12,
+    maxPlayersInServer = 18,
     
     -- ⏱️ ช่วงเวลาตรวจสอบผู้เล่น (วินาที)
     playerCheckInterval = 30,
