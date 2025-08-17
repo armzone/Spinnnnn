@@ -1,71 +1,44 @@
--- 🔥 Roblox Ultimate FPS Booster (High Performance Mode)
--- 🚀 รันแล้วได้ผลทันที — ไม่ต้องกด F9
--- 📌 เน้นลดโหลด GPU/CPU สูงสุด ด้วยการปิดเอฟเฟกต์ทั้งหมด
+-- 🔥 Roblox Ultra Minimal FPS Script
+-- 🎯 เป้าหมาย: กินทรัพยากรน้อยที่สุด + FPS คงที่
+-- 🚫 ไม่มี UI, ไม่มีเอฟเฟกต์, ไม่มีอะไรที่ไม่จำเป็น
 
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local StarterGui = game:GetService("StarterGui")
 
 local player = Players.LocalPlayer
 
-print("🚀 เริ่ม Ultimate FPS Booster...")
+-- ⚙️ ปิดทุกอย่างที่กินทรัพยากร
+local function ultraMinimalSetup()
+    -- 1. ตั้งค่าแสงต่ำสุด
+    Lighting.Ambient = Color3.new(0, 0, 0)
+    Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
+    Lighting.Brightness = 0.1
+    Lighting.GlobalShadows = false
+    Lighting.ShadowSoftness = 0
+    Lighting.ClockTime = 12
+    Lighting.FogEnd = 50
+    Lighting.FogColor = Color3.new(0, 0, 0)
+    Lighting.EnvironmentDiffuseScale = 0
+    Lighting.EnvironmentSpecularScale = 0
 
--- 🔅 1. ตั้งค่าแสงต่ำสุด + ท้องฟ้าสีดำ (ไม่มี skybox)
-local function setupBlackEnvironment()
-    -- ลบ Sky ทั้งหมด
+    -- 2. ลบ Sky
     for _, child in pairs(Lighting:GetChildren()) do
         if child:IsA("Sky") then
             child:Destroy()
         end
     end
 
-    -- ตั้งแสงพื้นฐานต่ำสุด
-    Lighting.Ambient = Color3.new(0, 0, 0)
-    Lighting.OutdoorAmbient = Color3.new(0, 0, 0)
-    Lighting.Brightness = 0.1
-    Lighting.GlobalShadows = false
-    Lighting.ClockTime = 14
-    Lighting.FogEnd = 80
-    Lighting.EnvironmentDiffuseScale = 0
-    Lighting.EnvironmentSpecularScale = 0
-
-    -- ปิด Shadow ทั้งระบบ
-    Lighting.ShadowSoftness = 0
-
-    print("🌑 พื้นหลังและแสงถูกลดสุดแล้ว")
-end
-
--- 🎞️ 2. ปิด Post-Processing Effects (กิน GPU มากที่สุด)
-local function disablePostProcessing()
+    -- 3. ปิด Post-Processing ทั้งหมด
     for _, effect in pairs(Lighting:GetDescendants()) do
         if effect:IsA("PostProcessingEffect") then
             effect.Enabled = false
         end
     end
 
-    -- ปิดเฉพาะตัวหนัก ๆ
-    for _, effect in pairs(Lighting:GetDescendants()) do
-        if effect:IsA("BloomEffect") then
-            effect.Enabled = false
-        elseif effect:IsA("BlurEffect") then
-            effect.Enabled = false
-        elseif effect:IsA("ColorCorrectionEffect") then
-            effect.Enabled = false
-        elseif effect:IsA("SunRaysEffect") then
-            effect.Enabled = false
-        elseif effect:IsA("DepthOfFieldEffect") then
-            effect.Enabled = false
-        end
-    end
-
-    print("🚫 ปิดเอฟเฟกต์ภาพทั้งหมดแล้ว (Bloom, Blur, Sun Rays ฯลฯ)")
-end
-
--- ⚙️ 3. ตั้งค่า Rendering ระดับต่ำสุด
-local function setLowGraphicsSettings()
-    local success = pcall(function()
+    -- 4. ตั้งค่า Rendering ต่ำสุด
+    pcall(function()
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
         settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level01
         settings().Rendering.EnableFRM = false
@@ -73,15 +46,13 @@ local function setLowGraphicsSettings()
         game:GetService("UserSettings").GameSettings.SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
     end)
 
-    if success then
-        print("📉 ตั้งค่ากราฟิกต่ำสุดสำเร็จ")
-    else
-        warn("⚠️ ไม่สามารถตั้งค่ากราฟิกได้ (อาจถูกจำกัดโดยเกม)")
-    end
-end
+    -- 5. ตั้งค่า Streaming ให้โหลดน้อยที่สุด
+    Workspace.StreamingEnabled = true
+    Workspace.StreamingMinRadius = 32
+    Workspace.StreamingTargetRadius = 40  -- โหลดแค่รอบตัว
+    Workspace.StreamOutBehavior = Enum.StreamOutBehavior.LowMemory
 
--- 🌍 4. ปรับแต่ง Terrain และ Streaming
-local function optimizeWorld()
+    -- 6. ปรับ Terrain (ถ้ามี)
     local terrain = Workspace:FindFirstChild("Terrain")
     if terrain then
         terrain.WaterWaveSize = 0
@@ -91,55 +62,39 @@ local function optimizeWorld()
         pcall(function() terrain.Decoration = false end)
     end
 
-    -- เปิด Streaming แต่ตั้งระยะต่ำ
-    Workspace.StreamingEnabled = true
-    Workspace.StreamingMinRadius = 32
-    Workspace.StreamingTargetRadius = 20
-    Workspace.StreamOutBehavior = Enum.StreamOutBehavior.LowMemory
-
-    print("🌍 ปรับแต่งโลกและ streaming แล้ว")
-end
-
--- 🧱 5. ปรับแต่งชิ้นส่วนทั้งหมดใน Workspace
-local function optimizeParts()
-    local function process(obj)
-        if obj:IsA("BasePart") then
+    -- 7. ปิดทุก Particle, Trail, Beam, Fire, Smoke
+    local function disableHeavyObjects(obj)
+        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or 
+           obj:IsA("Beam") or obj:IsA("Fire") or obj:IsA("Smoke") then
+            obj.Enabled = false
+        elseif obj:IsA("Decal") then
+            obj.Transparency = 0.7  -- ลดความละเอียด
+        elseif obj:IsA("BasePart") then
             obj.CastShadow = false
             obj.Reflectance = 0
-            obj.Material = Enum.Material.SmoothPlastic -- ลดความซับซ้อนของวัสดุ
-
+            obj.Material = Enum.Material.SmoothPlastic
             if obj:IsA("MeshPart") then
                 obj.RenderFidelity = Enum.RenderFidelity.Performance
                 obj.CollisionFidelity = Enum.CollisionFidelity.Box
             end
-        elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Fire") or obj:IsA("Smoke") then
-            obj.Enabled = false
-        elseif obj:IsA("Decal") then
-            obj.Transparency = 0.5 -- หรือ obj:Destroy() ถ้าต้องการลบทิ้ง
-        elseif obj:IsA("Beam") then
-            obj.Enabled = false
         end
     end
 
-    -- ปรับของที่มีอยู่แล้ว
+    -- ปรับของที่มีอยู่
     for _, obj in pairs(Workspace:GetDescendants()) do
-        process(obj)
+        disableHeavyObjects(obj)
     end
 
     -- ฟังของใหม่
     Workspace.DescendantAdded:Connect(function(obj)
-        task.spawn(process, obj)
+        task.spawn(disableHeavyObjects, obj)
     end)
 
-    print("🔧 ปรับแต่งชิ้นส่วนทั้งหมดแล้ว")
-end
-
--- 👥 6. ปรับแต่งตัวละครผู้เล่น (ไม่ใช่ตัวเรา)
-local function optimizeOtherCharacters()
+    -- 8. ปรับตัวละครผู้เล่นอื่น (ไม่ใช่ตัวเรา)
     Players.PlayerAdded:Connect(function(plr)
         if plr == player then return end
         plr.CharacterAdded:Connect(function(char)
-            task.wait(0.5)
+            task.wait(0.2)
             for _, obj in pairs(char:GetDescendants()) do
                 if obj:IsA("BasePart") then
                     obj.CastShadow = false
@@ -150,89 +105,8 @@ local function optimizeOtherCharacters()
         end)
     end)
 
-    -- ปรับผู้เล่นที่อยู่ก่อนหน้า
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and plr.Character then
-            for _, obj in pairs(plr.Character:GetDescendants()) do
-                if obj:IsA("BasePart") then
-                    obj.CastShadow = false
-                elseif obj:IsA("ParticleEmitter") or obj:IsA("Trail") then
-                    obj.Enabled = false
-                end
-            end
-        end
-    end
-
-    print("👥 ปรับแต่งตัวละครผู้เล่นอื่นแล้ว")
+    -- ✅ จบการตั้งค่า — ไม่มี notification, ไม่มี print, ไม่มีอะไรเพิ่ม
 end
 
--- 📊 7. เพิ่ม FPS Counter (ไม่บังตา)
-local function createFPSCounter()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "UltimateFPSCounter"
-    screenGui.ResetOnSpawn = false
-    screenGui.Parent = player:WaitForChild("PlayerGui")
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0, 100, 0, 30)
-    frame.Position = UDim2.new(0, 10, 0, 10)
-    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    frame.BackgroundTransparency = 0.4
-    frame.BorderSizePixel = 0
-    frame.ZIndex = 10
-    frame.Parent = screenGui
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = frame
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = "FPS: --"
-    label.TextColor3 = Color3.fromRGB(0, 255, 0)
-    label.TextSize = 16
-    label.Font = Enum.Font.Code
-    label.Parent = frame
-
-    local lastTime = tick()
-    local frameCount = 0
-
-    RunService.RenderStepped:Connect(function()
-        frameCount += 1
-        local currentTime = tick()
-        if currentTime - lastTime >= 1 then
-            local fps = math.floor(frameCount / (currentTime - lastTime))
-            label.Text = "FPS: " .. fps
-            label.TextColor3 = fps >= 50 and Color3.fromRGB(0, 255, 0) or
-                              fps >= 30 and Color3.fromRGB(255, 255, 0) or
-                              Color3.fromRGB(255, 0, 0)
-            frameCount = 0
-            lastTime = currentTime
-        end
-    end)
-
-    print("📊 สร้าง FPS Counter แล้ว")
-end
-
--- 🚀 8. เริ่มทุกอย่างทันที
-local function startOptimization()
-    setupBlackEnvironment()
-    disablePostProcessing()
-    setLowGraphicsSettings()
-    optimizeWorld()
-    optimizeParts()
-    optimizeOtherCharacters()
-    createFPSCounter()
-
-    print("✅ Ultimate FPS Booster ทำงานเสร็จสิ้น!")
-    StarterGui:SetCore("SendNotification", {
-        Title = "FPS Booster",
-        Text = "ระบบเพิ่มประสิทธิภาพทำงานแล้ว! 🚀",
-        Duration = 5,
-        Icon = "rbxassetid://7733964719"
-    })
-end
-
--- ✅ เริ่มทันทีเมื่อรัน
-task.spawn(startOptimization)
+-- 🚀 เริ่มทันทีเมื่อรัน
+task.spawn(ultraMinimalSetup)
