@@ -27,7 +27,7 @@ local function setupBlackEnvironment()
     Lighting.Brightness = 0.1
     Lighting.GlobalShadows = false
     Lighting.ClockTime = 14
-    Lighting.FogEnd = 100000
+    Lighting.FogEnd = 80
     Lighting.EnvironmentDiffuseScale = 0
     Lighting.EnvironmentSpecularScale = 0
 
@@ -94,7 +94,7 @@ local function optimizeWorld()
     -- เปิด Streaming แต่ตั้งระยะต่ำ
     Workspace.StreamingEnabled = true
     Workspace.StreamingMinRadius = 32
-    Workspace.StreamingTargetRadius = 50
+    Workspace.StreamingTargetRadius = 20
     Workspace.StreamOutBehavior = Enum.StreamOutBehavior.LowMemory
 
     print("🌍 ปรับแต่งโลกและ streaming แล้ว")
