@@ -1,4 +1,4 @@
--- 🎮 Auto Server Hopper - ใช้กับเซิร์ฟเวอร์ Python Monitor
+-- 🎮 Auto Server Hopper - ใช้กับเซิร์ฟเวอร์ Python Monitor (มี Delay หลังโดนฆ่า)
 -- 🔧 การตั้งค่าที่สามารถปรับได้ขณะทำงาน
 if game.PlaceId ~= 104715542330896 then
     warn("❌ ไม่ใช่แมพที่กำหนด สคริปต์จะไม่ทำงาน")
@@ -8,22 +8,25 @@ end
 -- 🌟 ตัวแปรที่สามารถปรับได้ผ่าน _G (เปลี่ยนได้ขณะทำงาน)
 _G.ServerHopperConfig = _G.ServerHopperConfig or {
     -- ⏰ เวลาการเปลี่ยนเซิร์ฟอัตโนมัติ (นาที)
-    autoSwitchMinutes = 30,
+    autoSwitchMinutes = 60,
     
     -- 💀 จำนวนครั้งที่ถูกผู้เล่นฆ่าก่อนเปลี่ยนเซิร์ฟ
-    maxPlayerKills = 2,
+    maxPlayerKills = 1,
+    
+    -- ⏱️ เวลารอหลังโดนฆ่าก่อนย้ายเซิร์ฟ (วินาที)
+    killDelaySeconds = 15,
     
     -- 👥 จำนวนผู้เล่นสูงสุดในเซิร์ฟ
-    maxPlayersInServer = 20,
+    maxPlayersInServer = 16,
     
     -- ⏱️ ช่วงเวลาตรวจสอบผู้เล่น (วินาที)
     playerCheckInterval = 30,
     
-    -- 🔗 ช่วงเวลาทดสอบการเชื่อมต่อ Python Server (วินาที)
+    -- ⏱️ ช่วงเวลาทดสอบการเชื่อมต่อ Python Server (วินาที)
     connectionTestInterval = 120,
     
     -- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor
-    monitorServerUrl = "http://185.84.161.87/api/roblox-servers",
+    monitorServerUrl = "http://127.0.0.1:5000/api/roblox-servers",
     
     -- 🎨 การแสดงผล UI
     showUI = true,
@@ -40,24 +43,27 @@ local player = Players.LocalPlayer
 local placeId = game.PlaceId
 local killedByPlayerCount = 0
 local alreadyTeleported = false
+local killDelayActive = false -- ตัวแปรสำหรับเช็ค delay หลังโดนฆ่า
 
 -- ⏰ ตัวแปรสำหรับระบบการเปลี่ยนเซิร์ฟแบบจับเวลา
 local serverStartTime = tick()
 local lastSwitchTime = serverStartTime
 
 -- 🎯 UI Elements
-local timerLabel, titleLabel, statusLabel, mainFrame
+local timerLabel, titleLabel, statusLabel, mainFrame, killDelayLabel
 
 print("📌 สคริปต์เริ่มทำงาน (ใช้เซิร์ฟเวอร์ Python Monitor)")
 print("🔧 การตั้งค่าปัจจุบัน:")
 print("   ⏰ เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
 print("   💀 เปลี่ยนเซิร์ฟเมื่อถูกฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
+print("   ⏱️ รอหลังโดนฆ่า: " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที")
 print("   👥 เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน: " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
 print("🌐 Monitor URL: " .. _G.ServerHopperConfig.monitorServerUrl)
 print("")
 print("💡 วิธีเปลี่ยนการตั้งค่าขณะทำงาน:")
 print("   _G.ServerHopperConfig.autoSwitchMinutes = 30  -- เปลี่ยนเป็น 30 นาที")
 print("   _G.ServerHopperConfig.maxPlayerKills = 3      -- เปลี่ยนเป็น 3 ครั้ง")
+print("   _G.ServerHopperConfig.killDelaySeconds = 20   -- รอ 20 วินาทีหลังโดนฆ่า")
 print("   _G.ServerHopperConfig.maxPlayersInServer = 10 -- เปลี่ยนเป็น 10 คน")
 print("   _G.ServerHopperConfig.showUI = false          -- ซ่อน UI")
 
@@ -77,10 +83,10 @@ local function createTimerUI()
     screenGui.Parent = playerGui
     screenGui.ResetOnSpawn = false
     
-    -- สร้าง Frame หลัก
+    -- สร้าง Frame หลัก (เพิ่มขนาดสำหรับ Kill Delay)
     mainFrame = Instance.new("Frame")
     mainFrame.Name = "TimerFrame"
-    mainFrame.Size = UDim2.new(0, 380, 0, 120)
+    mainFrame.Size = UDim2.new(0, 380, 0, 140) -- เพิ่มความสูง
     mainFrame.Position = UDim2.new(0.5, -190, 0, 20)
     mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     mainFrame.BackgroundTransparency = 0.3
@@ -109,22 +115,36 @@ local function createTimerUI()
     -- สร้าง TextLabel สำหรับเวลานับถอยหลัง
     timerLabel = Instance.new("TextLabel")
     timerLabel.Name = "TimerLabel"
-    timerLabel.Size = UDim2.new(1, 0, 0, 40)
+    timerLabel.Size = UDim2.new(1, 0, 0, 35)
     timerLabel.Position = UDim2.new(0, 0, 0, 30)
     timerLabel.BackgroundTransparency = 1
     timerLabel.Text = _G.ServerHopperConfig.autoSwitchMinutes .. ":00"
     timerLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-    timerLabel.TextSize = 28
+    timerLabel.TextSize = 24
     timerLabel.TextStrokeTransparency = 0
     timerLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     timerLabel.Font = Enum.Font.GothamBold
     timerLabel.Parent = mainFrame
     
+    -- สร้าง TextLabel สำหรับ Kill Delay Countdown
+    killDelayLabel = Instance.new("TextLabel")
+    killDelayLabel.Name = "KillDelayLabel"
+    killDelayLabel.Size = UDim2.new(1, 0, 0, 20)
+    killDelayLabel.Position = UDim2.new(0, 0, 0, 65)
+    killDelayLabel.BackgroundTransparency = 1
+    killDelayLabel.Text = ""
+    killDelayLabel.TextColor3 = Color3.fromRGB(255, 150, 150)
+    killDelayLabel.TextSize = 12
+    killDelayLabel.TextStrokeTransparency = 0
+    killDelayLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    killDelayLabel.Font = Enum.Font.GothamBold
+    killDelayLabel.Parent = mainFrame
+    
     -- สร้าง TextLabel สำหรับสถานะการเชื่อมต่อ
     statusLabel = Instance.new("TextLabel")
     statusLabel.Name = "StatusLabel"
     statusLabel.Size = UDim2.new(1, 0, 0, 20)
-    statusLabel.Position = UDim2.new(0, 0, 0, 75)
+    statusLabel.Position = UDim2.new(0, 0, 0, 90)
     statusLabel.BackgroundTransparency = 1
     statusLabel.Text = "🔗 กำลังเชื่อมต่อ..."
     statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -138,9 +158,9 @@ local function createTimerUI()
     local configLabel = Instance.new("TextLabel")
     configLabel.Name = "ConfigLabel"
     configLabel.Size = UDim2.new(1, 0, 0, 20)
-    configLabel.Position = UDim2.new(0, 0, 0, 95)
+    configLabel.Position = UDim2.new(0, 0, 0, 115)
     configLabel.BackgroundTransparency = 1
-    configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
+    configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | รอ: " .. _G.ServerHopperConfig.killDelaySeconds .. "วิ | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
     configLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     configLabel.TextSize = 10
     configLabel.TextStrokeTransparency = 0
@@ -148,7 +168,7 @@ local function createTimerUI()
     configLabel.Font = Enum.Font.Gotham
     configLabel.Parent = mainFrame
     
-    return timerLabel, titleLabel, statusLabel, configLabel
+    return timerLabel, titleLabel, statusLabel, configLabel, killDelayLabel
 end
 
 -- ✅ ฟังก์ชันแสดงเวลาที่เหลือ
@@ -159,6 +179,18 @@ local function getTimeRemaining()
     local minutes = math.floor(remaining / 60)
     local seconds = math.floor(remaining % 60)
     return minutes, seconds, remaining
+end
+
+-- ✅ ฟังก์ชันอัพเดต Kill Delay UI
+local function updateKillDelayUI(remainingSeconds)
+    if not _G.ServerHopperConfig.showUI or not killDelayLabel then return end
+    
+    if remainingSeconds > 0 then
+        killDelayLabel.Text = "💀 กำลังรอย้ายเซิร์ฟ: " .. remainingSeconds .. " วินาที..."
+        killDelayLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    else
+        killDelayLabel.Text = ""
+    end
 end
 
 -- ✅ ฟังก์ชันอัพเดต UI เวลา
@@ -187,9 +219,9 @@ local function updateTimerUI()
     end
     
     -- อัพเดตข้อมูลการตั้งค่า
-    local configLabel = mainFrame:FindFirstChild("ConfigLabel")
+    local configLabel = mainFrame and mainFrame:FindFirstChild("ConfigLabel")
     if configLabel then
-        configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
+        configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | รอ: " .. _G.ServerHopperConfig.killDelaySeconds .. "วิ | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
     end
 end
 
@@ -356,6 +388,33 @@ function teleportToNewServer(reason)
     end
 end
 
+-- ✅ ฟังก์ชัน Kill Delay พร้อม Countdown
+local function startKillDelay()
+    if killDelayActive then return end -- ถ้า delay อยู่แล้วไม่ต้องเริ่มใหม่
+    
+    killDelayActive = true
+    local remainingTime = _G.ServerHopperConfig.killDelaySeconds
+    
+    print("⏳ รอ " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที ก่อนย้ายเซิร์ฟเวอร์...")
+    
+    -- สร้าง countdown loop
+    task.spawn(function()
+        while remainingTime > 0 and killDelayActive do
+            updateKillDelayUI(remainingTime)
+            task.wait(1)
+            remainingTime -= 1
+        end
+        
+        -- หลังจากเวลาผ่านไป
+        if killDelayActive then
+            updateKillDelayUI(0)
+            print("⏰ ครบเวลารอแล้ว! กำลังเปลี่ยนเซิร์ฟเวอร์...")
+            teleportToNewServer("ถูกผู้เล่นฆ่าเกินกำหนด (หลังรอ " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที)")
+            killDelayActive = false
+        end
+    end)
+end
+
 -- ✅ ลูปตรวจจับ GUI DeathMessage
 task.spawn(function()
     while not alreadyTeleported do
@@ -387,8 +446,8 @@ task.spawn(function()
                     print("💀 ถูกผู้เล่นฆ่าโดย: " .. killerName .. " (รวม " .. killedByPlayerCount .. " ครั้ง)")
 
                     if killedByPlayerCount >= _G.ServerHopperConfig.maxPlayerKills then
-                        print("⚠️ ถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง กำลังหาเซิร์ฟใหม่...")
-                        teleportToNewServer("ถูกผู้เล่นฆ่าเกินกำหนด")
+                        print("⚠️ ถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
+                        startKillDelay() -- เริ่มนับถอยหลังแทนการย้ายทันที
                     end
                 else
                     if _G.ServerHopperConfig.verboseLogging then
@@ -504,17 +563,40 @@ _G.switchServerNow = function()
     teleportToNewServer("คำสั่งเปลี่ยนเซิร์ฟทันที")
 end
 
+-- 🔧 ฟังก์ชันสำหรับยกเลิก Kill Delay
+_G.cancelKillDelay = function()
+    if killDelayActive then
+        killDelayActive = false
+        updateKillDelayUI(0)
+        print("🛑 ยกเลิกการรอหลังโดนฆ่าแล้ว")
+    else
+        print("⚠️ ไม่มีการรออยู่")
+    end
+end
+
+-- 🔧 ฟังก์ชันสำหรับรีเซ็ตจำนวนครั้งที่โดนฆ่า
+_G.resetKillCount = function()
+    killedByPlayerCount = 0
+    killDelayActive = false
+    updateKillDelayUI(0)
+    print("🔄 รีเซ็ตจำนวนครั้งที่โดนฆ่าแล้ว")
+end
+
 -- 🔧 ฟังก์ชันสำหรับแสดงการตั้งค่าปัจจุบัน
 _G.showConfig = function()
     print("🔧 การตั้งค่าปัจจุบัน:")
     print("   ⏰ เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
     print("   💀 เปลี่ยนเซิร์ฟเมื่อถูกฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
+    print("   ⏱️ รอหลังโดนฆ่า: " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที")
     print("   👥 เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน: " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
     print("   ⏱️ ตรวจสอบผู้เล่นทุกๆ: " .. _G.ServerHopperConfig.playerCheckInterval .. " วินาที")
     print("   🔗 ทดสอบการเชื่อมต่อทุกๆ: " .. _G.ServerHopperConfig.connectionTestInterval .. " วินาที")
     print("   🌐 Monitor URL: " .. _G.ServerHopperConfig.monitorServerUrl)
     print("   🎨 แสดง UI: " .. tostring(_G.ServerHopperConfig.showUI))
     print("   📊 แสดงรายละเอียด: " .. tostring(_G.ServerHopperConfig.verboseLogging))
+    print("📊 สถานะปัจจุบัน:")
+    print("   💀 ถูกฆ่าแล้ว: " .. killedByPlayerCount .. " ครั้ง")
+    print("   ⏳ กำลังรอหลังโดนฆ่า: " .. tostring(killDelayActive))
 end
 
 -- 🔧 ฟังก์ชันสำหรับรีเฟรช UI
@@ -538,7 +620,7 @@ createTimerUI()
 
 -- ✅ แสดงสถานะเริ่มต้น
 print("🎯 ระบบทำงาน:")
-print("   - เปลี่ยนเซิร์ฟเมื่อถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
+print("   - เปลี่ยนเซิร์ฟเมื่อถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง (รอ " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาทีก่อนย้าย)")
 print("   - เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
 print("   - เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
 print("   - ดึงข้อมูลเซิร์ฟเวอร์จาก Python Monitor")
@@ -548,17 +630,20 @@ end
 print("🌐 Monitor Server: " .. _G.ServerHopperConfig.monitorServerUrl)
 print("")
 print("🔧 คำสั่งที่สามารถใช้ได้:")
-print("   _G.showConfig()          -- แสดงการตั้งค่าปัจจุบัน")
+print("   _G.showConfig()          -- แสดงการตั้งค่าและสถานะปัจจุบัน")
 print("   _G.resetServerTimer()    -- รีเซ็ตเวลานับถอยหลัง")
 print("   _G.switchServerNow()     -- เปลี่ยนเซิร์ฟเวอร์ทันที")
+print("   _G.cancelKillDelay()     -- ยกเลิกการรอหลังโดนฆ่า")
+print("   _G.resetKillCount()      -- รีเซ็ตจำนวนครั้งที่โดนฆ่า")
 print("   _G.refreshUI()           -- รีเฟรช UI")
 print("")
 print("💡 ตัวอย่างการเปลี่ยนการตั้งค่า:")
-print("   _G.ServerHopperConfig.autoSwitchMinutes = 30")
-print("   _G.ServerHopperConfig.maxPlayerKills = 3")
-print("   _G.ServerHopperConfig.maxPlayersInServer = 10")
-print("   _G.ServerHopperConfig.showUI = false")
-print("   _G.ServerHopperConfig.verboseLogging = false")
+print("   _G.ServerHopperConfig.autoSwitchMinutes = 30  -- เปลี่ยนเป็น 30 นาที")
+print("   _G.ServerHopperConfig.maxPlayerKills = 3      -- เปลี่ยนเป็น 3 ครั้ง")
+print("   _G.ServerHopperConfig.killDelaySeconds = 20   -- รอ 20 วินาทีหลังโดนฆ่า")
+print("   _G.ServerHopperConfig.maxPlayersInServer = 10 -- เปลี่ยนเป็น 10 คน")
+print("   _G.ServerHopperConfig.showUI = false          -- ซ่อน UI")
+print("   _G.ServerHopperConfig.verboseLogging = false  -- ปิดการแสดงรายละเอียด")
 print("   _G.refreshUI()  -- อัพเดต UI หลังเปลี่ยนการตั้งค่า")
 printTimeStatus()
 
