@@ -26,7 +26,7 @@ _G.ServerHopperConfig = _G.ServerHopperConfig or {
     connectionTestInterval = 120,
     
     -- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor
-    monitorServerUrl = "http://127.0.0.1:5000/api/roblox-servers",
+    monitorServerUrl = "http://localhost:5000/api/roblox-servers",
     
     -- 🎨 การแสดงผล UI
     showUI = true,
