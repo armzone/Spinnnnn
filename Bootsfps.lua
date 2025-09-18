@@ -1,4 +1,3 @@
-wait(30)
 -- ⚡ Roblox Potato Mode VRAM Saver
 -- 🥔 ตัดทุกอย่างที่ไม่จำเป็น เหลือแต่ UI + Black Screen Toggle + Mute Sounds
 
