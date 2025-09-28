@@ -1,655 +1,262 @@
--- 🎮 Auto Server Hopper - ใช้กับเซิร์ฟเวอร์ Python Monitor (มี Delay หลังโดนฆ่า)
--- 🔧 การตั้งค่าที่สามารถปรับได้ขณะทำงาน
-if game.PlaceId ~= 104715542330896 then
-    warn("❌ ไม่ใช่แมพที่กำหนด สคริปต์จะไม่ทำงาน")
-    return
+local md5 = {}
+local hmac = {}
+local base64 = {}
+
+do
+	do
+		local T = {
+			0xd76aa478,
+			0xe8c7b756,
+			0x242070db,
+			0xc1bdceee,
+			0xf57c0faf,
+			0x4787c62a,
+			0xa8304613,
+			0xfd469501,
+			0x698098d8,
+			0x8b44f7af,
+			0xffff5bb1,
+			0x895cd7be,
+			0x6b901122,
+			0xfd987193,
+			0xa679438e,
+			0x49b40821,
+			0xf61e2562,
+			0xc040b340,
+			0x265e5a51,
+			0xe9b6c7aa,
+			0xd62f105d,
+			0x02441453,
+			0xd8a1e681,
+			0xe7d3fbc8,
+			0x21e1cde6,
+			0xc33707d6,
+			0xf4d50d87,
+			0x455a14ed,
+			0xa9e3e905,
+			0xfcefa3f8,
+			0x676f02d9,
+			0x8d2a4c8a,
+			0xfffa3942,
+			0x8771f681,
+			0x6d9d6122,
+			0xfde5380c,
+			0xa4beea44,
+			0x4bdecfa9,
+			0xf6bb4b60,
+			0xbebfbc70,
+			0x289b7ec6,
+			0xeaa127fa,
+			0xd4ef3085,
+			0x04881d05,
+			0xd9d4d039,
+			0xe6db99e5,
+			0x1fa27cf8,
+			0xc4ac5665,
+			0xf4292244,
+			0x432aff97,
+			0xab9423a7,
+			0xfc93a039,
+			0x655b59c3,
+			0x8f0ccc92,
+			0xffeff47d,
+			0x85845dd1,
+			0x6fa87e4f,
+			0xfe2ce6e0,
+			0xa3014314,
+			0x4e0811a1,
+			0xf7537e82,
+			0xbd3af235,
+			0x2ad7d2bb,
+			0xeb86d391,
+		}
+
+		local function add(a, b)
+			local lsw = bit32.band(a, 0xFFFF) + bit32.band(b, 0xFFFF)
+			local msw = bit32.rshift(a, 16) + bit32.rshift(b, 16) + bit32.rshift(lsw, 16)
+			return bit32.bor(bit32.lshift(msw, 16), bit32.band(lsw, 0xFFFF))
+		end
+
+		local function rol(x, n)
+			return bit32.bor(bit32.lshift(x, n), bit32.rshift(x, 32 - n))
+		end
+
+		local function F(x, y, z)
+			return bit32.bor(bit32.band(x, y), bit32.band(bit32.bnot(x), z))
+		end
+		local function G(x, y, z)
+			return bit32.bor(bit32.band(x, z), bit32.band(y, bit32.bnot(z)))
+		end
+		local function H(x, y, z)
+			return bit32.bxor(x, bit32.bxor(y, z))
+		end
+		local function I(x, y, z)
+			return bit32.bxor(y, bit32.bor(x, bit32.bnot(z)))
+		end
+
+		function md5.sum(message)
+			local a, b, c, d = 0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476
+
+			local message_len = #message
+			local padded_message = message .. "\128"
+			while #padded_message % 64 ~= 56 do
+				padded_message = padded_message .. "\0"
+			end
+
+			local len_bytes = ""
+			local len_bits = message_len * 8
+			for i = 0, 7 do
+				len_bytes = len_bytes .. string.char(bit32.band(bit32.rshift(len_bits, i * 8), 0xFF))
+			end
+			padded_message = padded_message .. len_bytes
+
+			for i = 1, #padded_message, 64 do
+				local chunk = padded_message:sub(i, i + 63)
+				local X = {}
+				for j = 0, 15 do
+					local b1, b2, b3, b4 = chunk:byte(j * 4 + 1, j * 4 + 4)
+					X[j] = bit32.bor(b1, bit32.lshift(b2, 8), bit32.lshift(b3, 16), bit32.lshift(b4, 24))
+				end
+
+				local aa, bb, cc, dd = a, b, c, d
+
+				local s = { 7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21 }
+
+				for j = 0, 63 do
+					local f, k, shift_index
+					if j < 16 then
+						f = F(b, c, d)
+						k = j
+						shift_index = j % 4
+					elseif j < 32 then
+						f = G(b, c, d)
+						k = (1 + 5 * j) % 16
+						shift_index = 4 + (j % 4)
+					elseif j < 48 then
+						f = H(b, c, d)
+						k = (5 + 3 * j) % 16
+						shift_index = 8 + (j % 4)
+					else
+						f = I(b, c, d)
+						k = (7 * j) % 16
+						shift_index = 12 + (j % 4)
+					end
+
+					local temp = add(a, f)
+					temp = add(temp, X[k])
+					temp = add(temp, T[j + 1])
+					temp = rol(temp, s[shift_index + 1])
+
+					local new_b = add(b, temp)
+					a, b, c, d = d, new_b, b, c
+				end
+
+				a = add(a, aa)
+				b = add(b, bb)
+				c = add(c, cc)
+				d = add(d, dd)
+			end
+
+			local function to_le_hex(n)
+				local s = ""
+				for i = 0, 3 do
+					s = s .. string.char(bit32.band(bit32.rshift(n, i * 8), 0xFF))
+				end
+				return s
+			end
+
+			return to_le_hex(a) .. to_le_hex(b) .. to_le_hex(c) .. to_le_hex(d)
+		end
+	end
+
+	do
+		function hmac.new(key, msg, hash_func)
+			if #key > 64 then
+				key = hash_func(key)
+			end
+
+			local o_key_pad = ""
+			local i_key_pad = ""
+			for i = 1, 64 do
+				local byte = (i <= #key and string.byte(key, i)) or 0
+				o_key_pad = o_key_pad .. string.char(bit32.bxor(byte, 0x5C))
+				i_key_pad = i_key_pad .. string.char(bit32.bxor(byte, 0x36))
+			end
+
+			return hash_func(o_key_pad .. hash_func(i_key_pad .. msg))
+		end
+	end
+
+	do
+		local b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+		function base64.encode(data)
+			return (
+				(data:gsub(".", function(x)
+					local r, b_val = "", x:byte()
+					for i = 8, 1, -1 do
+						r = r .. (b_val % 2 ^ i - b_val % 2 ^ (i - 1) > 0 and "1" or "0")
+					end
+					return r
+				end) .. "0000"):gsub("%d%d%d?%d?%d?%d?", function(x)
+					if #x < 6 then
+						return ""
+					end
+					local c = 0
+					for i = 1, 6 do
+						c = c + (x:sub(i, i) == "1" and 2 ^ (6 - i) or 0)
+					end
+					return b:sub(c + 1, c + 1)
+				end) .. ({ "", "==", "=" })[#data % 3 + 1]
+			)
+		end
+	end
 end
 
--- 🌟 ตัวแปรที่สามารถปรับได้ผ่าน _G (เปลี่ยนได้ขณะทำงาน)
-_G.ServerHopperConfig = _G.ServerHopperConfig or {
-    -- ⏰ เวลาการเปลี่ยนเซิร์ฟอัตโนมัติ (นาที)
-    autoSwitchMinutes = 60,
-    
-    -- 💀 จำนวนครั้งที่ถูกผู้เล่นฆ่าก่อนเปลี่ยนเซิร์ฟ
-    maxPlayerKills = 1,
-    
-    -- ⏱️ เวลารอหลังโดนฆ่าก่อนย้ายเซิร์ฟ (วินาที)
-    killDelaySeconds = 15,
-    
-    -- 👥 จำนวนผู้เล่นสูงสุดในเซิร์ฟ
-    maxPlayersInServer = 16,
-    
-    -- ⏱️ ช่วงเวลาตรวจสอบผู้เล่น (วินาที)
-    playerCheckInterval = 30,
-    
-    -- ⏱️ ช่วงเวลาทดสอบการเชื่อมต่อ Python Server (วินาที)
-    connectionTestInterval = 120,
-    
-    -- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor
-    monitorServerUrl = "http://localhost:5000/api/roblox-servers",
-    
-    -- 🎨 การแสดงผล UI
-    showUI = true,
-    
-    -- 📊 การแสดงผลใน Console
-    verboseLogging = false
-}
+local function GenerateReservedServerCode(placeId)
+	local uuid = {}
+	for i = 1, 16 do
+		uuid[i] = math.random(0, 255)
+	end
 
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
+	uuid[7] = bit32.bor(bit32.band(uuid[7], 0x0F), 0x40) -- v4
+	uuid[9] = bit32.bor(bit32.band(uuid[9], 0x3F), 0x80) -- RFC 4122
 
-local placeId = game.PlaceId
-local killedByPlayerCount = 0
-local alreadyTeleported = false
-local killDelayActive = false -- ตัวแปรสำหรับเช็ค delay หลังโดนฆ่า
+	local firstBytes = ""
+	for i = 1, 16 do
+		firstBytes = firstBytes .. string.char(uuid[i])
+	end
 
--- ⏰ ตัวแปรสำหรับระบบการเปลี่ยนเซิร์ฟแบบจับเวลา
-local serverStartTime = tick()
-local lastSwitchTime = serverStartTime
+	local gameCode =
+		string.format("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", table.unpack(uuid))
 
--- 🎯 UI Elements
-local timerLabel, titleLabel, statusLabel, mainFrame, killDelayLabel
+	local placeIdBytes = ""
+	local pIdRec = placeId
+	for _ = 1, 8 do
+		placeIdBytes = placeIdBytes .. string.char(pIdRec % 256)
+		pIdRec = math.floor(pIdRec / 256)
+	end
 
-print("📌 สคริปต์เริ่มทำงาน (ใช้เซิร์ฟเวอร์ Python Monitor)")
-print("🔧 การตั้งค่าปัจจุบัน:")
-print("   ⏰ เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
-print("   💀 เปลี่ยนเซิร์ฟเมื่อถูกฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
-print("   ⏱️ รอหลังโดนฆ่า: " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที")
-print("   👥 เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน: " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
-print("🌐 Monitor URL: " .. _G.ServerHopperConfig.monitorServerUrl)
-print("")
-print("💡 วิธีเปลี่ยนการตั้งค่าขณะทำงาน:")
-print("   _G.ServerHopperConfig.autoSwitchMinutes = 30  -- เปลี่ยนเป็น 30 นาที")
-print("   _G.ServerHopperConfig.maxPlayerKills = 3      -- เปลี่ยนเป็น 3 ครั้ง")
-print("   _G.ServerHopperConfig.killDelaySeconds = 20   -- รอ 20 วินาทีหลังโดนฆ่า")
-print("   _G.ServerHopperConfig.maxPlayersInServer = 10 -- เปลี่ยนเป็น 10 คน")
-print("   _G.ServerHopperConfig.showUI = false          -- ซ่อน UI")
+	local content = firstBytes .. placeIdBytes
 
--- 🎨 สร้าง UI แสดงเวลานับถอยหลัง
-local function createTimerUI()
-    if not _G.ServerHopperConfig.showUI then return end
-    
-    local playerGui = player:WaitForChild("PlayerGui")
-    
-    -- ลบ UI เก่าถ้ามี
-    local existingUI = playerGui:FindFirstChild("ServerTimerUI")
-    if existingUI then existingUI:Destroy() end
-    
-    -- สร้าง ScreenGui
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "ServerTimerUI"
-    screenGui.Parent = playerGui
-    screenGui.ResetOnSpawn = false
-    
-    -- สร้าง Frame หลัก (เพิ่มขนาดสำหรับ Kill Delay)
-    mainFrame = Instance.new("Frame")
-    mainFrame.Name = "TimerFrame"
-    mainFrame.Size = UDim2.new(0, 380, 0, 140) -- เพิ่มความสูง
-    mainFrame.Position = UDim2.new(0.5, -190, 0, 20)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    mainFrame.BackgroundTransparency = 0.3
-    mainFrame.BorderSizePixel = 0
-    mainFrame.Parent = screenGui
-    
-    -- เพิ่ม UICorner ให้ Frame
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = mainFrame
-    
-    -- สร้าง TextLabel สำหรับหัวข้อ
-    titleLabel = Instance.new("TextLabel")
-    titleLabel.Name = "TitleLabel"
-    titleLabel.Size = UDim2.new(1, 0, 0, 25)
-    titleLabel.Position = UDim2.new(0, 0, 0, 5)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "🔄 Python Monitor Connection"
-    titleLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
-    titleLabel.TextSize = 14
-    titleLabel.TextStrokeTransparency = 0
-    titleLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Parent = mainFrame
-    
-    -- สร้าง TextLabel สำหรับเวลานับถอยหลัง
-    timerLabel = Instance.new("TextLabel")
-    timerLabel.Name = "TimerLabel"
-    timerLabel.Size = UDim2.new(1, 0, 0, 35)
-    timerLabel.Position = UDim2.new(0, 0, 0, 30)
-    timerLabel.BackgroundTransparency = 1
-    timerLabel.Text = _G.ServerHopperConfig.autoSwitchMinutes .. ":00"
-    timerLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-    timerLabel.TextSize = 24
-    timerLabel.TextStrokeTransparency = 0
-    timerLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    timerLabel.Font = Enum.Font.GothamBold
-    timerLabel.Parent = mainFrame
-    
-    -- สร้าง TextLabel สำหรับ Kill Delay Countdown
-    killDelayLabel = Instance.new("TextLabel")
-    killDelayLabel.Name = "KillDelayLabel"
-    killDelayLabel.Size = UDim2.new(1, 0, 0, 20)
-    killDelayLabel.Position = UDim2.new(0, 0, 0, 65)
-    killDelayLabel.BackgroundTransparency = 1
-    killDelayLabel.Text = ""
-    killDelayLabel.TextColor3 = Color3.fromRGB(255, 150, 150)
-    killDelayLabel.TextSize = 12
-    killDelayLabel.TextStrokeTransparency = 0
-    killDelayLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    killDelayLabel.Font = Enum.Font.GothamBold
-    killDelayLabel.Parent = mainFrame
-    
-    -- สร้าง TextLabel สำหรับสถานะการเชื่อมต่อ
-    statusLabel = Instance.new("TextLabel")
-    statusLabel.Name = "StatusLabel"
-    statusLabel.Size = UDim2.new(1, 0, 0, 20)
-    statusLabel.Position = UDim2.new(0, 0, 0, 90)
-    statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "🔗 กำลังเชื่อมต่อ..."
-    statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    statusLabel.TextSize = 12
-    statusLabel.TextStrokeTransparency = 0
-    statusLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    statusLabel.Font = Enum.Font.Gotham
-    statusLabel.Parent = mainFrame
-    
-    -- สร้าง TextLabel สำหรับการตั้งค่า
-    local configLabel = Instance.new("TextLabel")
-    configLabel.Name = "ConfigLabel"
-    configLabel.Size = UDim2.new(1, 0, 0, 20)
-    configLabel.Position = UDim2.new(0, 0, 0, 115)
-    configLabel.BackgroundTransparency = 1
-    configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | รอ: " .. _G.ServerHopperConfig.killDelaySeconds .. "วิ | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
-    configLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    configLabel.TextSize = 10
-    configLabel.TextStrokeTransparency = 0
-    configLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    configLabel.Font = Enum.Font.Gotham
-    configLabel.Parent = mainFrame
-    
-    return timerLabel, titleLabel, statusLabel, configLabel, killDelayLabel
+	local SUPERDUPERSECRETROBLOXKEYTHATTHEYDIDNTCHANGEEVERSINCEFOREVER = "e4Yn8ckbCJtw2sv7qmbg" -- legacy leaked key from ages ago that still works due to roblox being roblox.
+	local signature = hmac.new(SUPERDUPERSECRETROBLOXKEYTHATTHEYDIDNTCHANGEEVERSINCEFOREVER, content, md5.sum)
+
+	local accessCodeBytes = signature .. content
+
+	local accessCode = base64.encode(accessCodeBytes)
+	accessCode = accessCode:gsub("+", "-"):gsub("/", "_")
+
+	local pdding = 0
+	accessCode, _ = accessCode:gsub("=", function()
+		pdding = pdding + 1
+		return ""
+	end)
+
+	accessCode = accessCode .. tostring(pdding)
+
+	return accessCode, gameCode
 end
 
--- ✅ ฟังก์ชันแสดงเวลาที่เหลือ
-local function getTimeRemaining()
-    local autoSwitchInterval = _G.ServerHopperConfig.autoSwitchMinutes * 60 -- แปลงเป็นวินาที
-    local elapsed = tick() - lastSwitchTime
-    local remaining = autoSwitchInterval - elapsed
-    local minutes = math.floor(remaining / 60)
-    local seconds = math.floor(remaining % 60)
-    return minutes, seconds, remaining
-end
-
--- ✅ ฟังก์ชันอัพเดต Kill Delay UI
-local function updateKillDelayUI(remainingSeconds)
-    if not _G.ServerHopperConfig.showUI or not killDelayLabel then return end
-    
-    if remainingSeconds > 0 then
-        killDelayLabel.Text = "💀 กำลังรอย้ายเซิร์ฟ: " .. remainingSeconds .. " วินาที..."
-        killDelayLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    else
-        killDelayLabel.Text = ""
-    end
-end
-
--- ✅ ฟังก์ชันอัพเดต UI เวลา
-local function updateTimerUI()
-    if not _G.ServerHopperConfig.showUI or not timerLabel then return end
-    
-    local minutes, seconds, remaining = getTimeRemaining()
-    if remaining > 0 then
-        timerLabel.Text = string.format("%02d:%02d", minutes, seconds)
-        
-        -- เปลี่ยนสีตามเวลาที่เหลือ
-        if remaining <= 60 then
-            timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            titleLabel.Text = "⚠️ Server Switch Soon!"
-        elseif remaining <= 300 then
-            timerLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-            titleLabel.Text = "⏰ Python Monitor Active"
-        else
-            timerLabel.TextColor3 = Color3.fromRGB(0, 200, 255)
-            titleLabel.Text = "🔄 Python Monitor Connection"
-        end
-    else
-        timerLabel.Text = "00:00"
-        timerLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-        titleLabel.Text = "🚀 Switching Server..."
-    end
-    
-    -- อัพเดตข้อมูลการตั้งค่า
-    local configLabel = mainFrame and mainFrame:FindFirstChild("ConfigLabel")
-    if configLabel then
-        configLabel.Text = "⚙️ เปลี่ยนเซิร์ฟ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. "นาที | ฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. "ครั้ง | รอ: " .. _G.ServerHopperConfig.killDelaySeconds .. "วิ | คน: " .. _G.ServerHopperConfig.maxPlayersInServer
-    end
-end
-
--- ✅ ฟังก์ชันอัพเดตสถานะการเชื่อมต่อ
-local function updateConnectionStatus(status, serverCount)
-    if not _G.ServerHopperConfig.showUI or not statusLabel then return end
-    
-    if status == "connected" then
-        statusLabel.Text = "✅ เชื่อมต่อสำเร็จ | เซิร์ฟเวอร์: " .. (serverCount or 0)
-        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    elseif status == "error" then
-        statusLabel.Text = "❌ เชื่อมต่อล้มเหลว | ลองใหม่..."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    else
-        statusLabel.Text = "🔗 กำลังเชื่อมต่อ..."
-        statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    end
-end
-
--- ✅ ฟังก์ชันแสดงสถานะเวลา (สำหรับ console)
-local function printTimeStatus()
-    if not _G.ServerHopperConfig.verboseLogging then return end
-    
-    local minutes, seconds, remaining = getTimeRemaining()
-    if remaining > 0 then
-        print("⏰ เวลาที่เหลือก่อนเปลี่ยนเซิร์ฟ: " .. minutes .. " นาที " .. seconds .. " วินาที")
-    else
-        print("⏰ ถึงเวลาเปลี่ยนเซิร์ฟแล้ว!")
-    end
-end
-
--- ✅ ฟัง Event เมื่อล้มเหลวในการ Teleport
-TeleportService.TeleportInitFailed:Connect(function(failedPlayer, teleportResult, errorMessage)
-    if failedPlayer == player and not alreadyTeleported then
-        warn("❌ TeleportInitFailed:", teleportResult, errorMessage)
-        task.delay(2, function()
-            teleportToNewServer("TeleportInitFailed")
-        end)
-    end
-end)
-
--- ✅ ตรวจว่า string เป็นตัวเลขล้วน
-local function isNumericName(name)
-    return name:match("^%d+$") ~= nil
-end
-
--- ✅ ตรวจว่า DeathMessage มีชื่อของผู้เล่นอื่น
-local function checkIfKilledByOtherPlayer(text)
-    if _G.ServerHopperConfig.verboseLogging then
-        print("🔎 กำลังตรวจสอบข้อความ: " .. text)
-    end
-    local textLower = text:lower()
-
-    for _, otherPlayer in ipairs(Players:GetPlayers()) do
-        if otherPlayer ~= player then
-            local nameLower = otherPlayer.Name:lower()
-            local displayLower = otherPlayer.DisplayName:lower()
-            if textLower:find(nameLower) or textLower:find(displayLower) then
-                if _G.ServerHopperConfig.verboseLogging then
-                    print("💥 พบชื่อผู้เล่นในข้อความ:", otherPlayer.Name)
-                end
-                return true, otherPlayer.Name
-            end
-        end
-    end
-
-    for word in string.gmatch(text, "[^%s%-]+") do
-        local cleanedWord = word:gsub("[^%d]", "")
-        if isNumericName(cleanedWord) and #cleanedWord >= 6 then
-            if _G.ServerHopperConfig.verboseLogging then
-                print("💥 พบชื่อเป็นตัวเลขล้วน:", cleanedWord)
-            end
-            return true, cleanedWord
-        end
-    end
-
-    if _G.ServerHopperConfig.verboseLogging then
-        print("❌ ไม่มีชื่อผู้เล่นในข้อความ")
-    end
-    return false
-end
-
--- 🌐 ดึงข้อมูลจากเซิร์ฟเวอร์ Python Monitor และสุ่ม JobId
-local function getRandomJobId()
-    if _G.ServerHopperConfig.verboseLogging then
-        print("🌐 กำลังดึง JobId จากเซิร์ฟเวอร์ Python Monitor...")
-    end
-    updateConnectionStatus("connecting")
-    
-    local success, response = pcall(function()
-        return game:HttpGet(_G.ServerHopperConfig.monitorServerUrl)
-    end)
-
-    if success and response then
-        local serverData = HttpService:JSONDecode(response)
-        local serverList = {}
-        
-        for _, serverInfo in pairs(serverData) do
-            if serverInfo.id and serverInfo.id ~= game.JobId then
-                table.insert(serverList, serverInfo.id)
-                if _G.ServerHopperConfig.verboseLogging then
-                    print("✅ พบ JobId: " .. serverInfo.id .. " (ผู้เล่น: " .. serverInfo.playing .. "/" .. serverInfo.maxPlayers .. ", Ping: " .. serverInfo.ping .. ")")
-                end
-            end
-        end
-        
-        if #serverList > 0 then
-            updateConnectionStatus("connected", #serverList)
-            if _G.ServerHopperConfig.verboseLogging then
-                print("🔁 สุ่ม JobId ใหม่จากทั้งหมด: " .. #serverList)
-            end
-            return serverList[math.random(1, #serverList)]
-        else
-            updateConnectionStatus("error")
-            warn("⚠️ ไม่มีเซิร์ฟอื่นที่ต่างจากปัจจุบัน")
-        end
-    else
-        updateConnectionStatus("error")
-        warn("❌ ดึงข้อมูลจากเซิร์ฟเวอร์ Python ไม่สำเร็จ: " .. tostring(response))
-        warn("💡 ตรวจสอบว่าเซิร์ฟเวอร์ Python ทำงานอยู่และ URL ถูกต้อง")
-    end
-    return nil
-end
-
--- ✅ ฟังก์ชันเทเลพอร์ตซ้ำจนกว่าจะสำเร็จ
-function teleportToNewServer(reason)
-    if alreadyTeleported then
-        print("⚠️ ห้ามเทเลพอร์ตซ้ำ")
-        return
-    end
-
-    print("🚀 เริ่มกระบวนการเปลี่ยนเซิร์ฟ เหตุผล: " .. (reason or "ไม่ระบุ"))
-    
-    local attempt = 0
-
-    while not alreadyTeleported do
-        attempt += 1
-        local jobId = getRandomJobId()
-
-        if jobId then
-            print("🚀 [ครั้งที่ " .. attempt .. "] พยายาม teleport ไป JobId: " .. jobId)
-
-            local success, err = pcall(function()
-                TeleportService:TeleportToPlaceInstance(placeId, jobId, player)
-            end)
-
-            if not success then
-                print("❌ pcall ล้มเหลว:", err)
-                task.wait(2)
-            else
-                print("✅ ส่งคำสั่ง Teleport แล้ว")
-                local checkTime = 0
-                while checkTime < 10 do
-                    if alreadyTeleported then break end
-                    task.wait(1)
-                    checkTime += 1
-                end
-                print("⚠️ ยังไม่ออกจากเซิร์ฟเวอร์เดิม ลอง teleport ใหม่")
-            end
-        else
-            print("⚠️ ไม่มี JobId ให้เทเลพอร์ต ลองใหม่อีกครั้งใน 3 วิ")
-            task.wait(3)
-        end
-    end
-end
-
--- ✅ ฟังก์ชัน Kill Delay พร้อม Countdown
-local function startKillDelay()
-    if killDelayActive then return end -- ถ้า delay อยู่แล้วไม่ต้องเริ่มใหม่
-    
-    killDelayActive = true
-    local remainingTime = _G.ServerHopperConfig.killDelaySeconds
-    
-    print("⏳ รอ " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที ก่อนย้ายเซิร์ฟเวอร์...")
-    
-    -- สร้าง countdown loop
-    task.spawn(function()
-        while remainingTime > 0 and killDelayActive do
-            updateKillDelayUI(remainingTime)
-            task.wait(1)
-            remainingTime -= 1
-        end
-        
-        -- หลังจากเวลาผ่านไป
-        if killDelayActive then
-            updateKillDelayUI(0)
-            print("⏰ ครบเวลารอแล้ว! กำลังเปลี่ยนเซิร์ฟเวอร์...")
-            teleportToNewServer("ถูกผู้เล่นฆ่าเกินกำหนด (หลังรอ " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที)")
-            killDelayActive = false
-        end
-    end)
-end
-
--- ✅ ลูปตรวจจับ GUI DeathMessage
-task.spawn(function()
-    while not alreadyTeleported do
-        local success, err = pcall(function()
-            local guiPath = player:WaitForChild("PlayerGui"):FindFirstChild("DeathScreen")
-            if not guiPath then error("DeathScreen ยังไม่พบ") end
-
-            local holder = guiPath:FindFirstChild("DeathScreenHolder")
-            if not holder then error("DeathScreenHolder ยังไม่พบ") end
-
-            local frame1 = holder:FindFirstChild("Frame")
-            if not frame1 then error("Frame ชั้นที่ 1 ยังไม่พบ") end
-
-            local frame2 = frame1:FindFirstChild("Frame") or frame1
-            local deathMessage = frame2:FindFirstChild("DeathMessage")
-            if not deathMessage then error("DeathMessage ยังไม่พบ") end
-
-            print("✅ พบ DeathMessage:", deathMessage)
-
-            deathMessage:GetPropertyChangedSignal("Text"):Connect(function()
-                local newText = deathMessage.Text
-                if _G.ServerHopperConfig.verboseLogging then
-                    print("🔁 ตรวจพบข้อความใหม่: " .. newText)
-                end
-
-                local killed, killerName = checkIfKilledByOtherPlayer(newText)
-                if killed then
-                    killedByPlayerCount += 1
-                    print("💀 ถูกผู้เล่นฆ่าโดย: " .. killerName .. " (รวม " .. killedByPlayerCount .. " ครั้ง)")
-
-                    if killedByPlayerCount >= _G.ServerHopperConfig.maxPlayerKills then
-                        print("⚠️ ถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
-                        startKillDelay() -- เริ่มนับถอยหลังแทนการย้ายทันที
-                    end
-                else
-                    if _G.ServerHopperConfig.verboseLogging then
-                        print("✅ ไม่พบชื่อผู้เล่นอื่นในข้อความ")
-                    end
-                end
-            end)
-        end)
-
-        if not success then
-            warn("❌ ยังหา GUI ไม่เจอ: " .. tostring(err))
-            task.wait(5)
-        else
-            break
-        end
-    end
-end)
-
--- ✅ ลูปตรวจสอบจำนวนผู้เล่นในเซิร์ฟ
-task.spawn(function()
-    if _G.ServerHopperConfig.verboseLogging then
-        print("📊 เริ่มลูปตรวจสอบจำนวนผู้เล่น")
-    end
-    while not alreadyTeleported do
-        local currentPlayers = #Players:GetPlayers()
-        if _G.ServerHopperConfig.verboseLogging then
-            print("👥 จำนวนผู้เล่นในเซิร์ฟ: " .. currentPlayers)
-        end
-
-        if currentPlayers > _G.ServerHopperConfig.maxPlayersInServer then
-            print("⚠️ ผู้เล่นเกิน " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน กำลังสุ่มเซิร์ฟใหม่...")
-            teleportToNewServer("ผู้เล่นเกิน " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
-            break
-        else
-            if _G.ServerHopperConfig.verboseLogging then
-                print("✅ ยังอยู่ในเซิร์ฟที่เหมาะสม")
-            end
-        end
-        wait(_G.ServerHopperConfig.playerCheckInterval)
-    end
-end)
-
--- ⏰ ลูปตรวจสอบเวลาและเปลี่ยนเซิร์ฟอัตโนมัติ
-task.spawn(function()
-    if _G.ServerHopperConfig.verboseLogging then
-        print("⏰ เริ่มระบบการเปลี่ยนเซิร์ฟแบบจับเวลา")
-    end
-    
-    while not alreadyTeleported do
-        local minutes, seconds, remaining = getTimeRemaining()
-        
-        -- อัพเดต UI ทุกวินาที
-        updateTimerUI()
-        
-        -- แสดงเวลาที่เหลือทุก 5 นาที
-        if remaining > 0 and (remaining % 300 == 0 or remaining <= 60) then
-            printTimeStatus()
-        end
-        
-        -- ถ้าเวลาหมดแล้ว ให้เปลี่ยนเซิร์ฟ
-        if remaining <= 0 then
-            print("⏰ ครบ " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาทีแล้ว! กำลังเปลี่ยนเซิร์ฟเวอร์...")
-            teleportToNewServer("ครบเวลา " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาทีตามกำหนด")
-            break
-        end
-        
-        task.wait(1) -- ตรวจทุกวินาที
-    end
-end)
-
--- ⏰ ลูปทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Python
-task.spawn(function()
-    if _G.ServerHopperConfig.verboseLogging then
-        print("🔗 เริ่มทดสอบการเชื่อมต่อเซิร์ฟเวอร์ Python")
-    end
-    while not alreadyTeleported do
-        -- ทดสอบการเชื่อมต่อตามช่วงเวลาที่กำหนด
-        task.wait(_G.ServerHopperConfig.connectionTestInterval)
-        
-        local success, response = pcall(function()
-            return game:HttpGet(_G.ServerHopperConfig.monitorServerUrl)
-        end)
-        
-        if success and response then
-            local serverData = HttpService:JSONDecode(response)
-            local serverCount = 0
-            for _ in pairs(serverData) do
-                serverCount = serverCount + 1
-            end
-            updateConnectionStatus("connected", serverCount)
-            if _G.ServerHopperConfig.verboseLogging then
-                print("🔗 การเชื่อมต่อเซิร์ฟเวอร์ Python ปกติ (" .. serverCount .. " เซิร์ฟเวอร์)")
-            end
-        else
-            updateConnectionStatus("error")
-            warn("⚠️ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ Python ได้")
-        end
-    end
-end)
-
--- 🔧 ฟังก์ชันสำหรับรีเซ็ตเวลานับถอยหลัง
-_G.resetServerTimer = function()
-    lastSwitchTime = tick()
-    print("🔄 รีเซ็ตเวลานับถอยหลังแล้ว")
-    if _G.ServerHopperConfig.showUI then
-        updateTimerUI()
-    end
-end
-
--- 🔧 ฟังก์ชันสำหรับเปลี่ยนเซิร์ฟทันที
-_G.switchServerNow = function()
-    print("🚀 กำลังเปลี่ยนเซิร์ฟเวอร์ทันที...")
-    teleportToNewServer("คำสั่งเปลี่ยนเซิร์ฟทันที")
-end
-
--- 🔧 ฟังก์ชันสำหรับยกเลิก Kill Delay
-_G.cancelKillDelay = function()
-    if killDelayActive then
-        killDelayActive = false
-        updateKillDelayUI(0)
-        print("🛑 ยกเลิกการรอหลังโดนฆ่าแล้ว")
-    else
-        print("⚠️ ไม่มีการรออยู่")
-    end
-end
-
--- 🔧 ฟังก์ชันสำหรับรีเซ็ตจำนวนครั้งที่โดนฆ่า
-_G.resetKillCount = function()
-    killedByPlayerCount = 0
-    killDelayActive = false
-    updateKillDelayUI(0)
-    print("🔄 รีเซ็ตจำนวนครั้งที่โดนฆ่าแล้ว")
-end
-
--- 🔧 ฟังก์ชันสำหรับแสดงการตั้งค่าปัจจุบัน
-_G.showConfig = function()
-    print("🔧 การตั้งค่าปัจจุบัน:")
-    print("   ⏰ เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ: " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
-    print("   💀 เปลี่ยนเซิร์ฟเมื่อถูกฆ่า: " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง")
-    print("   ⏱️ รอหลังโดนฆ่า: " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาที")
-    print("   👥 เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน: " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
-    print("   ⏱️ ตรวจสอบผู้เล่นทุกๆ: " .. _G.ServerHopperConfig.playerCheckInterval .. " วินาที")
-    print("   🔗 ทดสอบการเชื่อมต่อทุกๆ: " .. _G.ServerHopperConfig.connectionTestInterval .. " วินาที")
-    print("   🌐 Monitor URL: " .. _G.ServerHopperConfig.monitorServerUrl)
-    print("   🎨 แสดง UI: " .. tostring(_G.ServerHopperConfig.showUI))
-    print("   📊 แสดงรายละเอียด: " .. tostring(_G.ServerHopperConfig.verboseLogging))
-    print("📊 สถานะปัจจุบัน:")
-    print("   💀 ถูกฆ่าแล้ว: " .. killedByPlayerCount .. " ครั้ง")
-    print("   ⏳ กำลังรอหลังโดนฆ่า: " .. tostring(killDelayActive))
-end
-
--- 🔧 ฟังก์ชันสำหรับรีเฟรช UI
-_G.refreshUI = function()
-    if _G.ServerHopperConfig.showUI then
-        createTimerUI()
-        print("🎨 รีเฟรช UI แล้ว")
-    else
-        -- ซ่อน UI
-        local playerGui = player:WaitForChild("PlayerGui")
-        local existingUI = playerGui:FindFirstChild("ServerTimerUI")
-        if existingUI then 
-            existingUI:Destroy() 
-            print("🎨 ซ่อน UI แล้ว")
-        end
-    end
-end
-
--- สร้าง UI เริ่มต้น
-createTimerUI()
-
--- ✅ แสดงสถานะเริ่มต้น
-print("🎯 ระบบทำงาน:")
-print("   - เปลี่ยนเซิร์ฟเมื่อถูกผู้เล่นฆ่าเกิน " .. _G.ServerHopperConfig.maxPlayerKills .. " ครั้ง (รอ " .. _G.ServerHopperConfig.killDelaySeconds .. " วินาทีก่อนย้าย)")
-print("   - เปลี่ยนเซิร์ฟเมื่อผู้เล่นเกิน " .. _G.ServerHopperConfig.maxPlayersInServer .. " คน")
-print("   - เปลี่ยนเซิร์ฟอัตโนมัติทุกๆ " .. _G.ServerHopperConfig.autoSwitchMinutes .. " นาที")
-print("   - ดึงข้อมูลเซิร์ฟเวอร์จาก Python Monitor")
-if _G.ServerHopperConfig.showUI then
-    print("🎨 UI Timer แสดงอยู่ด้านบนหน้าจอแล้ว!")
-end
-print("🌐 Monitor Server: " .. _G.ServerHopperConfig.monitorServerUrl)
-print("")
-print("🔧 คำสั่งที่สามารถใช้ได้:")
-print("   _G.showConfig()          -- แสดงการตั้งค่าและสถานะปัจจุบัน")
-print("   _G.resetServerTimer()    -- รีเซ็ตเวลานับถอยหลัง")
-print("   _G.switchServerNow()     -- เปลี่ยนเซิร์ฟเวอร์ทันที")
-print("   _G.cancelKillDelay()     -- ยกเลิกการรอหลังโดนฆ่า")
-print("   _G.resetKillCount()      -- รีเซ็ตจำนวนครั้งที่โดนฆ่า")
-print("   _G.refreshUI()           -- รีเฟรช UI")
-print("")
-print("💡 ตัวอย่างการเปลี่ยนการตั้งค่า:")
-print("   _G.ServerHopperConfig.autoSwitchMinutes = 30  -- เปลี่ยนเป็น 30 นาที")
-print("   _G.ServerHopperConfig.maxPlayerKills = 3      -- เปลี่ยนเป็น 3 ครั้ง")
-print("   _G.ServerHopperConfig.killDelaySeconds = 20   -- รอ 20 วินาทีหลังโดนฆ่า")
-print("   _G.ServerHopperConfig.maxPlayersInServer = 10 -- เปลี่ยนเป็น 10 คน")
-print("   _G.ServerHopperConfig.showUI = false          -- ซ่อน UI")
-print("   _G.ServerHopperConfig.verboseLogging = false  -- ปิดการแสดงรายละเอียด")
-print("   _G.refreshUI()  -- อัพเดต UI หลังเปลี่ยนการตั้งค่า")
-printTimeStatus()
-
--- เริ่มอัพเดต UI และทดสอบการเชื่อมต่อทันที
-updateTimerUI()
-task.spawn(function()
-    task.wait(2)
-    getRandomJobId() -- ทดสอบการเชื่อมต่อครั้งแรก
-end)
+local accessCode, _ = GenerateReservedServerCode(game.PlaceId)
+game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", accessCode)
