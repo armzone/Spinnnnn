@@ -288,19 +288,15 @@ function ServerManager.SaveCode(code)
 end
 
 function ServerManager.CreateNewServer()
-    if ServerManager.GetSavedCode() then
-        warn("⚠️ เซิร์ฟเวอร์ถูกสร้างไปแล้ว! ใช้โค้ดเดิมหรือรีเซ็ตก่อน")
-        return ServerManager.GetSavedCode()
-    end
-
+    -- ลบโค้ดเก่าทิ้งทุกครั้ง → สร้างใหม่เสมอ!
     local accessCode, _ = GenerateReservedServerCode(placeId)
     ServerManager.SaveCode(accessCode)
 
-    -- ส่งไปยังเซิร์ฟเวอร์ (ตามโค้ดเดิม)
+    -- ส่งไปยังเซิร์ฟเวอร์
     if game.ReplicatedStorage:FindFirstChild("ContactListIrisInviteTeleport") then
         game.ReplicatedStorage.ContactListIrisInviteTeleport:FireServer(placeId, "", accessCode)
     else
-        warn("⚠️ RemoteEvent ไม่พบ — อาจไม่ทำงาน!")
+        warn("⚠️ RemoteEvent 'ContactListIrisInviteTeleport' ไม่พบ!")
     end
 
     print("✅ สร้างเซิร์ฟเวอร์ใหม่:", accessCode)
@@ -309,14 +305,20 @@ end
 
 -- คัดลอกข้อความไปยังคลิปบอร์ด (ถ้าใช้ได้)
 function ServerManager.CopyToClipboard(text)
-    -- ใน Roblox Player (เดสก์ท็อป) อาจใช้ได้ผ่าน SetClipboard
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+
+    -- วิธีคัดลอกคลิปบอร์ดที่ถูกต้องใน Roblox (เฉพาะเดสก์ท็อป)
     local success, err = pcall(function()
-        game:GetService("Players").LocalPlayer:SetAttribute("Clipboard", text)
+        player:SetClipboard(text)
     end)
+
     if success then
+        print("✅ คัดลอก Access Code ไปยังคลิปบอร์ดแล้ว!")
         return true
     else
-        -- ถ้าไม่ได้ → แจ้งให้คัดลอกเอง
+        warn("⚠️ ไม่สามารถคัดลอกอัตโนมัติได้ (อาจอยู่ในเบราว์เซอร์)")
+        print("📋 กรุณาคัดลอกด้วยมือ:", text)
         return false
     end
 end
