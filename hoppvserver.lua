@@ -1,6 +1,6 @@
 local HttpService = game:GetService("HttpService")
 
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1419002326898704629/wv-PsR1_nOZsnumOmq1t-1xisDInKtPhjlB0xud7Tx05czjMoz0KiFKDmE_dVAoCgSsk" -- เปลี่ยนเป็น URL ของ webhook ของคุณ
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1422520155480526961/4YO2teD3ETXo0oJC4hGWdccxc_ztFy5IhnAJJC6dbdyUzCbmEWnxjvrtbk7Jfc3oszFz" -- เปลี่ยนเป็น URL ของ webhook ของคุณ
 
 local md5 = {}
 local hmac = {}
