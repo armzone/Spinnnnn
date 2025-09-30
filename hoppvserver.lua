@@ -1,6 +1,13 @@
+-- =============================================
+-- Reserved Server Manager + File Save System
+-- ใช้ได้เฉพาะใน Exploit ที่มี writefile, readfile, setclipboard
+-- =============================================
+
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+-- ========== MD5, HMAC, Base64 (ไม่เปลี่ยนแปลง) ==========
 local md5 = {}
 local hmac = {}
 local base64 = {}
@@ -168,6 +175,7 @@ do
 	end
 end
 
+-- ========== GenerateReservedServerCode ==========
 local function GenerateReservedServerCode(placeId)
 	local uuid = {}
 	for i = 1, 16 do
@@ -212,22 +220,46 @@ local function GenerateReservedServerCode(placeId)
 	return accessCode, gameCode
 end
 
--- สร้าง UI
+-- ========== ระบบไฟล์ (เฉพาะ Exploit) ==========
+local ACCESS_CODE_FILE = "reserved_server_code.txt"
+
+local function saveAccessCodeToFile(code)
+    if writefile then
+        writefile(ACCESS_CODE_FILE, code)
+        print("💾 บันทึก Access Code ลงไฟล์:", code)
+    else
+        warn("⚠️ writefile ไม่พร้อมใช้งาน")
+    end
+end
+
+local function loadAccessCodeFromFile()
+    if readfile and isfile and isfile(ACCESS_CODE_FILE) then
+        local content = readfile(ACCESS_CODE_FILE)
+        if content and content ~= "" then
+            return content
+        end
+    end
+    return nil
+end
+
+-- ========== UI ==========
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ServerCodeUI"
 screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = playerGui
 
 -- Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 400, 0, 300)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+mainFrame.Size = UDim2.new(0, 420, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -210, 0.5, -175)
 mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 mainFrame.BorderSizePixel = 0
+mainFrame.ZIndex = 10
 mainFrame.Parent = screenGui
 
 local corner = Instance.new("UICorner")
@@ -245,9 +277,10 @@ title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 20
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
+title.ZIndex = 11
 title.Parent = mainFrame
 
--- TextBox สำหรับกรอก Access Code
+-- TextBox
 local accessCodeBox = Instance.new("TextBox")
 accessCodeBox.Name = "AccessCodeBox"
 accessCodeBox.Size = UDim2.new(1, -40, 0, 45)
@@ -261,17 +294,18 @@ accessCodeBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
 accessCodeBox.TextSize = 14
 accessCodeBox.Font = Enum.Font.Gotham
 accessCodeBox.ClearTextOnFocus = false
+accessCodeBox.ZIndex = 11
 accessCodeBox.Parent = mainFrame
 
 local boxCorner = Instance.new("UICorner")
 boxCorner.CornerRadius = UDim.new(0, 8)
 boxCorner.Parent = accessCodeBox
 
--- ฟังก์ชันสร้างปุ่ม
+-- สร้างปุ่ม
 local function createButton(name, text, position, color)
 	local button = Instance.new("TextButton")
 	button.Name = name
-	button.Size = UDim2.new(1, -40, 0, 45)
+	button.Size = UDim2.new(1, -40, 0, 48)
 	button.Position = position
 	button.BackgroundColor3 = color
 	button.BorderSizePixel = 0
@@ -280,13 +314,13 @@ local function createButton(name, text, position, color)
 	button.TextSize = 15
 	button.Font = Enum.Font.GothamBold
 	button.AutoButtonColor = false
+	button.ZIndex = 11
 	button.Parent = mainFrame
 	
 	local btnCorner = Instance.new("UICorner")
 	btnCorner.CornerRadius = UDim.new(0, 8)
 	btnCorner.Parent = button
 	
-	-- Hover effect
 	button.MouseEnter:Connect(function()
 		TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(
 			math.min(color.R * 255 + 20, 255),
@@ -302,126 +336,114 @@ local function createButton(name, text, position, color)
 	return button
 end
 
--- ปุ่มที่ 1: สร้างและ Teleport
-local createButton = createButton(
-	"CreateButton",
-	"🚀 สร้างเซิฟเวอร์ใหม่และ Teleport",
-	UDim2.new(0, 20, 0, 130),
-	Color3.fromRGB(88, 101, 242)
-)
-
--- ปุ่มที่ 2: คัดลอก Access Code ปัจจุบัน
-local copyButton = createButton(
-	"CopyButton",
-	"📋 คัดลอก Access Code ปัจจุบัน",
-	UDim2.new(0, 20, 0, 185),
-	Color3.fromRGB(87, 242, 135)
-)
-
--- ปุ่มที่ 3: Teleport ไปยัง Access Code ที่กรอก
-local joinButton = createButton(
-	"JoinButton",
-	"🎯 เข้าร่วมเซิฟเวอร์",
-	UDim2.new(0, 20, 0, 240),
-	Color3.fromRGB(254, 231, 92)
-)
+local btn1 = createButton("CreateButton", "🚀 สร้างเซิฟเวอร์ใหม่และ Teleport", UDim2.new(0, 20, 0, 135), Color3.fromRGB(88, 101, 242))
+local btn2 = createButton("CopyButton", "📋 คัดลอก Access Code ปัจจุบัน", UDim2.new(0, 20, 0, 195), Color3.fromRGB(87, 242, 135))
+local btn3 = createButton("JoinButton", "🎯 เข้าร่วมเซิฟเวอร์", UDim2.new(0, 20, 0, 255), Color3.fromRGB(254, 231, 92))
 
 -- Status Label
 local statusLabel = Instance.new("TextLabel")
 statusLabel.Name = "StatusLabel"
-statusLabel.Size = UDim2.new(1, -40, 0, 20)
-statusLabel.Position = UDim2.new(0, 20, 1, -30)
+statusLabel.Size = UDim2.new(1, -40, 0, 25)
+statusLabel.Position = UDim2.new(0, 20, 1, -40)
 statusLabel.BackgroundTransparency = 1
 statusLabel.Text = "พร้อมใช้งาน"
 statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 statusLabel.TextSize = 12
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+statusLabel.ZIndex = 11
 statusLabel.Parent = mainFrame
 
--- ฟังก์ชันแสดงสถานะ
 local function showStatus(text, color)
 	statusLabel.Text = text
 	statusLabel.TextColor3 = color
-	task.wait(3)
-	statusLabel.Text = "พร้อมใช้งาน"
-	statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+	task.spawn(function()
+		task.wait(3)
+		if statusLabel.Text == text then
+			statusLabel.Text = "พร้อมใช้งาน"
+			statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+		end
+	end)
 end
 
--- ปุ่มที่ 1: สร้างและ Teleport
-createButton.MouseButton1Click:Connect(function()
-	local accessCode, gameCode = GenerateReservedServerCode(game.PlaceId)
-	print("Generated Access Code:", accessCode)
-	print("Game Code:", gameCode)
-	
-	showStatus("กำลังสร้างเซิฟเวอร์...", Color3.fromRGB(88, 101, 242))
-	
-	local success, err = pcall(function()
-		game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", accessCode)
-	end)
-	
-	if success then
-		showStatus("✓ กำลัง Teleport...", Color3.fromRGB(87, 242, 135))
-	else
-		showStatus("✗ เกิดข้อผิดพลาด: " .. tostring(err), Color3.fromRGB(237, 66, 69))
-	end
+-- ========== ปุ่มที่ 1: สร้าง + บันทึกไฟล์ ==========
+btn1.MouseButton1Click:Connect(function()
+    local success, result = pcall(function()
+        local accessCode, gameCode = GenerateReservedServerCode(game.PlaceId)
+        
+        -- 🔥 บันทึกลงไฟล์
+        saveAccessCodeToFile(accessCode)
+        
+        -- ส่งไปยังเซิร์ฟเวอร์
+        game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", accessCode)
+        
+        print("✅ สร้างเซิร์ฟเวอร์ใหม่:", accessCode)
+        return true
+    end)
+    
+    if success then
+        showStatus("✓ สร้างและบันทึกเรียบร้อย!", Color3.fromRGB(87, 242, 135))
+    else
+        showStatus("✗ สร้างไม่สำเร็จ", Color3.fromRGB(237, 66, 69))
+        warn("Error:", result)
+    end
 end)
 
--- ปุ่มที่ 2: คัดลอก Access Code ปัจจุบัน
-copyButton.MouseButton1Click:Connect(function()
-	local jobId = game.JobId
-	
-	if jobId == "" then
-		showStatus("✗ ไม่สามารถดึง Access Code ได้", Color3.fromRGB(237, 66, 69))
-		return
-	end
-	
-	-- ใส่ Access Code ลงในช่อง TextBox
-	accessCodeBox.Text = jobId
-	setclipboard(jobId)
-	
-	showStatus("✓ คัดลอก Access Code แล้ว!", Color3.fromRGB(87, 242, 135))
+-- ========== ปุ่มที่ 2: คัดลอกจากไฟล์ ==========
+btn2.MouseButton1Click:Connect(function()
+    local savedCode = loadAccessCodeFromFile()
+    if savedCode then
+        if setclipboard then
+            setclipboard(savedCode)
+            showStatus("✓ คัดลอกจากไฟล์แล้ว!", Color3.fromRGB(87, 242, 135))
+        else
+            accessCodeBox.Text = savedCode
+            showStatus("📋 ดูโค้ดในช่องกรอก", Color3.fromRGB(254, 231, 92))
+        end
+    else
+        showStatus("✗ ไม่พบไฟล์บันทึก", Color3.fromRGB(237, 66, 69))
+    end
 end)
 
--- ปุ่มที่ 3: Teleport ไปยัง Access Code ที่กรอก
-joinButton.MouseButton1Click:Connect(function()
-	local inputCode = accessCodeBox.Text
-	
-	if inputCode == "" or inputCode == nil then
-		showStatus("✗ กรุณากรอก Access Code", Color3.fromRGB(237, 66, 69))
-		return
-	end
-	
-	showStatus("กำลังเข้าร่วมเซิฟเวอร์...", Color3.fromRGB(254, 231, 92))
-	
-	local success, err = pcall(function()
-		game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", inputCode)
-	end)
-	
-	if success then
-		showStatus("✓ กำลัง Teleport...", Color3.fromRGB(87, 242, 135))
-	else
-		showStatus("✗ เกิดข้อผิดพลาด: " .. tostring(err), Color3.fromRGB(237, 66, 69))
-	end
+-- ========== ปุ่มที่ 3: เข้าร่วมจากช่องกรอก ==========
+btn3.MouseButton1Click:Connect(function()
+    local inputCode = accessCodeBox.Text
+    if inputCode == "" then
+        showStatus("✗ กรุณากรอก Access Code", Color3.fromRGB(237, 66, 69))
+        return
+    end
+    
+
+    local success, err = pcall(function()
+        game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", inputCode)
+    end)
+		if success then
+        showStatus("✓ กำลังเข้าร่วม...", Color3.fromRGB(87, 242, 135))
+    else
+        showStatus("✗ เข้าร่วมไม่ได้", Color3.fromRGB(237, 66, 69))
+        warn("Error:", err)
+    end
 end)
 
--- Draggable UI
-local dragging
-local dragInput
+-- ========== โหลดไฟล์อัตโนมัติเมื่อเปิด UI ==========
+spawn(function()
+    local saved = loadAccessCodeFromFile()
+    if saved then
+        accessCodeBox.Text = saved
+        print("📂 โหลด Access Code จากไฟล์:", saved)
+    end
+end)
+
+-- ========== Draggable UI ==========
+local dragging = false
 local dragStart
 local startPos
 
-local function update(input)
-	local delta = input.Position - dragStart
-	mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-end
-
 mainFrame.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
 		dragging = true
 		dragStart = input.Position
 		startPos = mainFrame.Position
-		
 		input.Changed:Connect(function()
 			if input.UserInputState == Enum.UserInputState.End then
 				dragging = false
@@ -430,16 +452,11 @@ mainFrame.InputBegan:Connect(function(input)
 	end
 end)
 
-mainFrame.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-		dragInput = input
-	end
-end)
-
 game:GetService("UserInputService").InputChanged:Connect(function(input)
-	if input == dragInput and dragging then
-		update(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+		local delta = input.Position - dragStart
+		mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 	end
 end)
 
-print("Reserved Server UI Loaded!")
+print("✅ Reserved Server Manager + File System โหลดเรียบร้อย!")
