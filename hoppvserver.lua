@@ -1,6 +1,5 @@
-local HttpService = game:GetService("HttpService")
-
-local WEBHOOK_URL = "https://discord.com/api/webhooks/1422520155480526961/4YO2teD3ETXo0oJC4hGWdccxc_ztFy5IhnAJJC6dbdyUzCbmEWnxjvrtbk7Jfc3oszFz" -- เปลี่ยนเป็น URL ของ webhook ของคุณ
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 local md5 = {}
 local hmac = {}
@@ -9,70 +8,22 @@ local base64 = {}
 do
 	do
 		local T = {
-			0xd76aa478,
-			0xe8c7b756,
-			0x242070db,
-			0xc1bdceee,
-			0xf57c0faf,
-			0x4787c62a,
-			0xa8304613,
-			0xfd469501,
-			0x698098d8,
-			0x8b44f7af,
-			0xffff5bb1,
-			0x895cd7be,
-			0x6b901122,
-			0xfd987193,
-			0xa679438e,
-			0x49b40821,
-			0xf61e2562,
-			0xc040b340,
-			0x265e5a51,
-			0xe9b6c7aa,
-			0xd62f105d,
-			0x02441453,
-			0xd8a1e681,
-			0xe7d3fbc8,
-			0x21e1cde6,
-			0xc33707d6,
-			0xf4d50d87,
-			0x455a14ed,
-			0xa9e3e905,
-			0xfcefa3f8,
-			0x676f02d9,
-			0x8d2a4c8a,
-			0xfffa3942,
-			0x8771f681,
-			0x6d9d6122,
-			0xfde5380c,
-			0xa4beea44,
-			0x4bdecfa9,
-			0xf6bb4b60,
-			0xbebfbc70,
-			0x289b7ec6,
-			0xeaa127fa,
-			0xd4ef3085,
-			0x04881d05,
-			0xd9d4d039,
-			0xe6db99e5,
-			0x1fa27cf8,
-			0xc4ac5665,
-			0xf4292244,
-			0x432aff97,
-			0xab9423a7,
-			0xfc93a039,
-			0x655b59c3,
-			0x8f0ccc92,
-			0xffeff47d,
-			0x85845dd1,
-			0x6fa87e4f,
-			0xfe2ce6e0,
-			0xa3014314,
-			0x4e0811a1,
-			0xf7537e82,
-			0xbd3af235,
-			0x2ad7d2bb,
-			0xeb86d391,
+			0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee,
+			0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+			0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be,
+			0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+			0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa,
+			0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+			0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed,
+			0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+			0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c,
+			0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+			0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05,
+			0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+			0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039,
+			0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+			0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
+			0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
 		}
 
 		local function add(a, b)
@@ -231,8 +182,7 @@ local function GenerateReservedServerCode(placeId)
 		firstBytes = firstBytes .. string.char(uuid[i])
 	end
 
-	local gameCode =
-		string.format("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", table.unpack(uuid))
+	local gameCode = string.format("%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x", table.unpack(uuid))
 
 	local placeIdBytes = ""
 	local pIdRec = placeId
@@ -262,33 +212,234 @@ local function GenerateReservedServerCode(placeId)
 	return accessCode, gameCode
 end
 
--- ส่งข้อมูลไปยัง webhook
-local function SendToWebhook(accessCode, gameCode, placeId)
-	local data = {
-		content = string.format("**Access Code Generated**\n```\nAccess Code: %s\nGame Code: %s\nPlace ID: %s\n```", 
-			accessCode, gameCode, tostring(placeId))
-	}
+-- สร้าง UI
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ServerCodeUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 400, 0, 300)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = mainFrame
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, -40, 0, 40)
+title.Position = UDim2.new(0, 20, 0, 15)
+title.BackgroundTransparency = 1
+title.Text = "Reserved Server Manager"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 20
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = mainFrame
+
+-- TextBox สำหรับกรอก Access Code
+local accessCodeBox = Instance.new("TextBox")
+accessCodeBox.Name = "AccessCodeBox"
+accessCodeBox.Size = UDim2.new(1, -40, 0, 45)
+accessCodeBox.Position = UDim2.new(0, 20, 0, 70)
+accessCodeBox.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+accessCodeBox.BorderSizePixel = 0
+accessCodeBox.Text = ""
+accessCodeBox.PlaceholderText = "กรอก Access Code ที่นี่..."
+accessCodeBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+accessCodeBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+accessCodeBox.TextSize = 14
+accessCodeBox.Font = Enum.Font.Gotham
+accessCodeBox.ClearTextOnFocus = false
+accessCodeBox.Parent = mainFrame
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 8)
+boxCorner.Parent = accessCodeBox
+
+-- ฟังก์ชันสร้างปุ่ม
+local function createButton(name, text, position, color)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Size = UDim2.new(1, -40, 0, 45)
+	button.Position = position
+	button.BackgroundColor3 = color
+	button.BorderSizePixel = 0
+	button.Text = text
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.TextSize = 15
+	button.Font = Enum.Font.GothamBold
+	button.AutoButtonColor = false
+	button.Parent = mainFrame
 	
-	local success, response = pcall(function()
-		return HttpService:PostAsync(
-			WEBHOOK_URL,
-			HttpService:JSONEncode(data),
-			Enum.HttpContentType.ApplicationJson,
-			false
-		)
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 8)
+	btnCorner.Parent = button
+	
+	-- Hover effect
+	button.MouseEnter:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(
+			math.min(color.R * 255 + 20, 255),
+			math.min(color.G * 255 + 20, 255),
+			math.min(color.B * 255 + 20, 255)
+		)}):Play()
+	end)
+	
+	button.MouseLeave:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = color}):Play()
+	end)
+	
+	return button
+end
+
+-- ปุ่มที่ 1: สร้างและ Teleport
+local createButton = createButton(
+	"CreateButton",
+	"🚀 สร้างเซิฟเวอร์ใหม่และ Teleport",
+	UDim2.new(0, 20, 0, 130),
+	Color3.fromRGB(88, 101, 242)
+)
+
+-- ปุ่มที่ 2: คัดลอก Access Code ปัจจุบัน
+local copyButton = createButton(
+	"CopyButton",
+	"📋 คัดลอก Access Code ปัจจุบัน",
+	UDim2.new(0, 20, 0, 185),
+	Color3.fromRGB(87, 242, 135)
+)
+
+-- ปุ่มที่ 3: Teleport ไปยัง Access Code ที่กรอก
+local joinButton = createButton(
+	"JoinButton",
+	"🎯 เข้าร่วมเซิฟเวอร์",
+	UDim2.new(0, 20, 0, 240),
+	Color3.fromRGB(254, 231, 92)
+)
+
+-- Status Label
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Name = "StatusLabel"
+statusLabel.Size = UDim2.new(1, -40, 0, 20)
+statusLabel.Position = UDim2.new(0, 20, 1, -30)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = "พร้อมใช้งาน"
+statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+statusLabel.TextSize = 12
+statusLabel.Font = Enum.Font.Gotham
+statusLabel.TextXAlignment = Enum.TextXAlignment.Center
+statusLabel.Parent = mainFrame
+
+-- ฟังก์ชันแสดงสถานะ
+local function showStatus(text, color)
+	statusLabel.Text = text
+	statusLabel.TextColor3 = color
+	task.wait(3)
+	statusLabel.Text = "พร้อมใช้งาน"
+	statusLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+end
+
+-- ปุ่มที่ 1: สร้างและ Teleport
+createButton.MouseButton1Click:Connect(function()
+	local accessCode, gameCode = GenerateReservedServerCode(game.PlaceId)
+	print("Generated Access Code:", accessCode)
+	print("Game Code:", gameCode)
+	
+	showStatus("กำลังสร้างเซิฟเวอร์...", Color3.fromRGB(88, 101, 242))
+	
+	local success, err = pcall(function()
+		game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", accessCode)
 	end)
 	
 	if success then
-		print("ส่งข้อมูลไปยัง webhook สำเร็จ")
+		showStatus("✓ กำลัง Teleport...", Color3.fromRGB(87, 242, 135))
 	else
-		warn("ไม่สามารถส่งข้อมูลไปยัง webhook ได้: " .. tostring(response))
+		showStatus("✗ เกิดข้อผิดพลาด: " .. tostring(err), Color3.fromRGB(237, 66, 69))
 	end
+end)
+
+-- ปุ่มที่ 2: คัดลอก Access Code ปัจจุบัน
+copyButton.MouseButton1Click:Connect(function()
+	local jobId = game.JobId
+	
+	if jobId == "" then
+		showStatus("✗ ไม่สามารถดึง Access Code ได้", Color3.fromRGB(237, 66, 69))
+		return
+	end
+	
+	-- ใส่ Access Code ลงในช่อง TextBox
+	accessCodeBox.Text = jobId
+	setclipboard(jobId)
+	
+	showStatus("✓ คัดลอก Access Code แล้ว!", Color3.fromRGB(87, 242, 135))
+end)
+
+-- ปุ่มที่ 3: Teleport ไปยัง Access Code ที่กรอก
+joinButton.MouseButton1Click:Connect(function()
+	local inputCode = accessCodeBox.Text
+	
+	if inputCode == "" or inputCode == nil then
+		showStatus("✗ กรุณากรอก Access Code", Color3.fromRGB(237, 66, 69))
+		return
+	end
+	
+	showStatus("กำลังเข้าร่วมเซิฟเวอร์...", Color3.fromRGB(254, 231, 92))
+	
+	local success, err = pcall(function()
+		game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", inputCode)
+	end)
+	
+	if success then
+		showStatus("✓ กำลัง Teleport...", Color3.fromRGB(87, 242, 135))
+	else
+		showStatus("✗ เกิดข้อผิดพลาด: " .. tostring(err), Color3.fromRGB(237, 66, 69))
+	end
+end)
+
+-- Draggable UI
+local dragging
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
 
-local accessCode, gameCode = GenerateReservedServerCode(game.PlaceId)
+mainFrame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+		
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
 
--- ส่งไปยัง webhook ก่อน
-SendToWebhook(accessCode, gameCode, game.PlaceId)
+mainFrame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
 
--- จากนั้นค่อย teleport
-game.RobloxReplicatedStorage.ContactListIrisInviteTeleport:FireServer(game.PlaceId, "", accessCode)
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		update(input)
+	end
+end)
+
+print("Reserved Server UI Loaded!")
