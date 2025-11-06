@@ -17,7 +17,7 @@ _G.ServerHopperConfig = _G.ServerHopperConfig or {
     killDelaySeconds = 15,
     
     -- 👥 จำนวนผู้เล่นสูงสุดในเซิร์ฟ
-    maxPlayersInServer = 17,
+    maxPlayersInServer = 10,
     
     -- ⏱️ ช่วงเวลาตรวจสอบผู้เล่น (วินาที)
     playerCheckInterval = 30,
@@ -26,7 +26,7 @@ _G.ServerHopperConfig = _G.ServerHopperConfig or {
     connectionTestInterval = 120,
     
     -- 🌐 URL ของเซิร์ฟเวอร์ Python Monitor
-    monitorServerUrl = "http://223.206.68.249:5000/api/roblox-servers",
+    monitorServerUrl = "http://223.206.70.95:5000//api/roblox-servers",
     
     -- 🎨 การแสดงผล UI
     showUI = true,
